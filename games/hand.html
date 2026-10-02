@@ -4,14 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Articulated 3D Hand</title>
+<link rel="stylesheet" href="hub-nav.css">
 <style>
   /* ---------- Page & canvas ---------- */
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2030;
                font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
   canvas { display: block; }
 
-  /* ---------- Hint label (top-left) ---------- */
-  #hint { position: absolute; top: 18px; left: 22px; color: rgba(255,255,255,.65);
+  /* ---------- Hint label (top-left, below back button) ---------- */
+  #hint { position: absolute; top: 68px; left: 20px; color: rgba(255,255,255,.65);
           font-size: 13px; letter-spacing: .04em; pointer-events: none; user-select: none; }
   #hint b { color: #fff; font-size: 16px; display: block; margin-bottom: 4px; letter-spacing: .08em; }
 
@@ -33,13 +34,15 @@
 </head>
 <body>
 
-<div id="hint"><b>3D HAND</b>Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan</div>
+<div id="hint"><b>3D HAND</b>Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan &bull; Esc pause</div>
 <div id="ui">
   <button data-pose="grab">Grab</button>
   <button data-pose="release" class="active">Release</button>
   <button data-pose="point">Point</button>
+  <button id="pauseHandBtn" type="button">Pause</button>
 </div>
 
+<script src="hub-nav.js"></script>
 <!-- Three.js (+ addons) from CDN via import map -->
 <script type="importmap">
 { "imports": {
@@ -283,10 +286,26 @@ function updateHand(dt) {
    MAIN LOOP & RESIZE
    ===================================================================== */
 const clock = new THREE.Clock();
+let isPaused = false;
+const hubNav = window.HubNav ? HubNav.init({
+  gameId: 'hand',
+  onPause: () => { isPaused = true; },
+  onResume: () => { isPaused = false; }
+}) : null;
+
+const pauseBtn = document.getElementById('pauseHandBtn');
+if (pauseBtn) {
+  pauseBtn.addEventListener('click', () => {
+    if (hubNav) hubNav.togglePause();
+  });
+}
+
 function animate() {
   requestAnimationFrame(animate);
-  updateHand(Math.min(clock.getDelta(), 0.05));
-  controls.update();
+  if (!isPaused) {
+    updateHand(Math.min(clock.getDelta(), 0.05));
+    controls.update();
+  }
   renderer.render(scene, camera);
 }
 animate();

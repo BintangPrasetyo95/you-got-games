@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Poolrooms - Level 37</title>
+<link rel="stylesheet" href="hub-nav.css">
 <style>
 html,body{margin:0;height:100%;background:#0b2226;overflow:hidden;font-family:Georgia,serif}
 canvas{display:block}
@@ -12,9 +13,18 @@ canvas{display:block}
 .hit{animation:hit .9s}
 @keyframes hit{0%{filter:none}12%{filter:invert(1) contrast(4) blur(2px);transform:scale(1.25) skewX(12deg)}30%{filter:hue-rotate(160deg) saturate(6) blur(6px);transform:scale(1.1) skewY(-8deg)}45%,75%{filter:brightness(0);transform:scale(1.4)}100%{filter:none;transform:none}}
 </style></head><body>
-<div id="ov"><h1>THE POOLROOMS</h1><p>Level 37. You are not alone.</p><p>WASD move, Shift sprint, mouse look, Esc pause</p><p><b>Click to enter</b></p></div>
+<div id="ov">
+  <div class="hub-spread-stars" id="poolSpreadStars"></div>
+  <div id="pool-star-icon" style="width: 86px; height: 86px; margin-bottom: 8px; position:relative; z-index:2;"></div>
+  <h1 style="position:relative; z-index:2;">THE POOLROOMS</h1>
+  <p style="position:relative; z-index:2;">Level 37. You are not alone.</p>
+  <p style="position:relative; z-index:2;">WASD move, Shift sprint, mouse look, Esc pause</p>
+  <p style="position:relative; z-index:2;"><b>Click to enter</b></p>
+  <a href="../index.html" id="poolBackBtn" class="hub-btn hub-btn-secondary" style="margin-top: 14px; text-decoration: none; padding: 10px 24px; position:relative; z-index:10;">← Back to Hub</a>
+</div>
 <div id="vig"></div><div id="hud"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="hub-nav.js"></script>
 <script>
 'use strict';
 /* CHANGELOG (search these tags): [SPAWN RATE] CFG anomalies/rampSecs | [SCALE] deep-room CFG + Leviathan size | [BOTTOMLESS] floorH
@@ -425,9 +435,20 @@ addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>key
 addEventListener('mousedown',()=>drag=true);addEventListener('mouseup',()=>drag=false);
 addEventListener('mousemove',e=>{if(!started||paused||!(locked||(fallback&&drag)))return;yaw-=e.movementX*CFG.mouseSens;pitch=Math.max(-1.45,Math.min(1.45,pitch-e.movementY*CFG.mouseSens))});
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===cv;if(!locked&&started&&!fallback){paused=true;ov.querySelector('b').textContent='Click to resume';ov.style.display='flex'}});
-document.addEventListener('pointerlockerror',()=>fallback=true); // sandboxed iframe: drag mouse to look instead
-ov.onclick=()=>{if(!AC)initAudio();AC.resume();started=true;paused=false;ov.style.display='none';
- try{Promise.resolve(cv.requestPointerLock()).catch(()=>fallback=true)}catch(e){fallback=true}};
+if(window.HubNav){
+  HubNav.init({gameId:'poolrooms',disablePauseOverlay:true});
+  const stops=HubNav.GAME_CONFIGS.poolrooms.stops;
+  document.getElementById('pool-star-icon').innerHTML=HubNav.createStarSvg('poolGrad',stops,'hub-hero-star');
+  document.getElementById('poolSpreadStars').innerHTML=Array.from({length:8},(_,i)=>
+    `<div class="hub-spread-star">${HubNav.createStarSvg('poolSpreadGrad_'+i,stops)}</div>`
+  ).join('');
+}
+
+ov.onclick=(e)=>{
+  if(e.target&&e.target.closest('#poolBackBtn'))return;
+  if(!AC)initAudio();AC.resume();started=true;paused=false;ov.style.display='none';
+  try{Promise.resolve(cv.requestPointerLock()).catch(()=>fallback=true)}catch(err){fallback=true}
+};
 
 /* ================= MAIN LOOP ================= */
 function update(dt){

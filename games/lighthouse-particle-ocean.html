@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lighthouse · Particle Ocean</title>
+<link rel="stylesheet" href="hub-nav.css">
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   canvas { display: block; }
@@ -12,7 +13,7 @@
 </style>
 </head>
 <body>
-<div id="hint">Drag to orbit, scroll to zoom</div>
+<div id="hint">Drag to orbit · Scroll to zoom · Esc to pause</div>
 
 <!-- Three.js r128 (UMD builds) + post-processing helpers -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -22,6 +23,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/MaskPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="hub-nav.js"></script>
 
 <script>
 /* ---------------------------------------------------------------
@@ -328,9 +330,27 @@ addEventListener('resize', resize);
 resize();
 
 const clock = new THREE.Clock();
+let isPaused = false;
+let pausedTime = 0;
+let pauseStart = 0;
+
+const hubNav = window.HubNav ? HubNav.init({
+  gameId: 'lighthouse',
+  onPause: () => {
+    isPaused = true;
+    pauseStart = clock.getElapsedTime();
+  },
+  onResume: () => {
+    isPaused = false;
+    pausedTime += (clock.getElapsedTime() - pauseStart);
+  }
+}) : null;
+
 function animate() {
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
+  if (isPaused) return;
+
+  const t = clock.getElapsedTime() - pausedTime;
 
   // Waves + rotating beam
   waveUniforms.uTime.value = t;

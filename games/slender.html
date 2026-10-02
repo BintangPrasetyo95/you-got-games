@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>Eight Pages</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="hub-nav.css">
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georgia,'Times New Roman',serif;color:#ddd;user-select:none}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
@@ -15,7 +16,7 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georg
 #hint{position:absolute;left:0;right:0;bottom:12%;text-align:center;opacity:0;letter-spacing:.3em;font-size:clamp(12px,1.4vw,20px);transition:opacity .2s}
 #msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.82);cursor:pointer;text-align:center;letter-spacing:.15em}
 #msg b{font-weight:normal;font-size:clamp(16px,2.4vw,34px);opacity:.75}
-#msg i{margin-top:1.2em;font-style:normal;font-size:clamp(11px,1.2vw,16px);opacity:.35}
+#msg i{margin-top:1.2em;font-style:normal;font-size:clamp(11px,1.2vw,16px);opacity:.35;line-height:1.6}
 </style>
 </head>
 <body>
@@ -24,9 +25,10 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georg
   <div id="vg"></div>
   <div id="pc">Pages: 0 / 8</div>
   <div id="hint">[ E ]</div>
-  <div id="msg"><b>Click to start (Requires Mouse Lock)</b><i>WASD move · Shift run · E take page · Esc pause</i></div>
+  <div id="msg"></div>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="hub-nav.js"></script>
 <script>
 (()=>{
 const $=id=>document.getElementById(id),box=$('box'),R=THREE,TOTAL=8;
@@ -125,24 +127,54 @@ function audio(){if(AC){AC.resume();return}
 /* ---------- UI / state helpers ---------- */
 const sc=$('st'),sx=sc.getContext('2d'),sd=sx.createImageData(96,54);
 function stat(a){sc.style.opacity=a;if(a<.03)return;const d=sd.data;for(let i=0;i<d.length;i+=4){d[i]=d[i+1]=d[i+2]=Math.random()*255;d[i+3]=255}sx.putImageData(sd,0,0)}
-const show=h=>{$('msg').innerHTML=h;$('msg').style.display='flex'};
+if (window.HubNav) {
+  HubNav.init({ gameId: 'slender', disablePauseOverlay: true });
+}
+
+const slenderStops = (window.HubNav && HubNav.GAME_CONFIGS.slender) ? HubNav.GAME_CONFIGS.slender.stops : [
+  { offset: '0%', color: '#fff0d0' },
+  { offset: '50%', color: '#52796f' },
+  { offset: '100%', color: '#16211d' }
+];
+
+const starSvg = () => window.HubNav ? HubNav.createStarSvg('slenderGrad', slenderStops, 'hub-hero-star') : '';
+const spreadStars = () => window.HubNav ? Array.from({length:6}, (_,i) =>
+  `<div class="hub-spread-star">${HubNav.createStarSvg('slenderSpread_'+i, slenderStops)}</div>`
+).join('') : '';
+
+const show = (title, sub) => {
+  $('msg').innerHTML = `
+    <div class="hub-spread-stars">${spreadStars()}</div>
+    <div style="position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; max-width:440px; padding:20px;">
+      <div style="width:78px; height:78px; margin-bottom:12px; filter:drop-shadow(0 0 16px rgba(255,240,208,0.5));">${starSvg()}</div>
+      <b>${title}</b>
+      <i>${sub}</i>
+      <a href="../index.html" class="hub-btn hub-btn-secondary" style="margin-top:16px; text-decoration:none; padding:8px 22px; font-size:13px; z-index:10;">← Back to Hub</a>
+    </div>
+  `;
+  $('msg').style.display = 'flex';
+};
+
+show('EIGHT PAGES', 'Click to start (Requires Mouse Lock)<br>WASD move · Shift run · E take page · Esc pause');
+
 function die(){if(state!=='play')return;state='dead';document.exitPointerLock();
   ent.position.set(cam.position.x-Math.sin(yaw)*1.1,0,cam.position.z-Math.cos(yaw)*1.1);
   ent.rotation.y=Math.atan2(cam.position.x-ent.position.x,cam.position.z-ent.position.z);pitch=.95;
-  setTimeout(()=>show('<b>IT FOUND YOU</b><i>Click to try again</i>'),1100)}
+  setTimeout(()=>show('IT FOUND YOU', 'Click to try again'),1100)}
 function take(p){scene.remove(p.g);pgs.splice(pgs.indexOf(p),1);got++;
   $('pc').textContent=`Pages: ${got} / ${TOTAL}`;$('pc').style.opacity=1;setTimeout(()=>$('pc').style.opacity=.4,1800);
-  if(got>=TOTAL){state='won';document.exitPointerLock();$('hint').style.opacity=0;show('<b>You made it out. For now.</b><i>Click to play again</i>');return}
+  if(got>=TOTAL){state='won';document.exitPointerLock();$('hint').style.opacity=0;show('YOU MADE IT OUT', 'Click to play again');return}
   diff();place(Math.max(9,22-got*1.6));unseen=0}
 
 /* ---------- input (native Pointer Lock API) ---------- */
-$('msg').addEventListener('click',()=>{
+$('msg').addEventListener('click', e => {
+  if (e.target && e.target.closest('a')) return;
   if(state==='dead'||state==='won'){location.reload();return}
   audio();renderer.domElement.requestPointerLock()});
 document.addEventListener('pointerlockchange',()=>{
   locked=document.pointerLockElement===renderer.domElement;
   if(locked){state='play';$('msg').style.display='none'}
-  else if(state==='play'){state='menu';show('<b>Paused</b><i>Click to resume</i>')}});
+  else if(state==='play'){state='menu';show('PAUSED', 'Click to resume')}});
 document.addEventListener('mousemove',e=>{if(!locked)return;yaw-=e.movementX*.0022;pitch=clamp(pitch-e.movementY*.0022,-1.45,1.45)});
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyE'&&state==='play'&&aim)take(aim)});
 addEventListener('keyup',e=>keys[e.code]=false);

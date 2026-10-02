@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOU GOT GAMES — Arcade & Game Hub</title>
+  <link rel="icon" type="image/svg+xml" href="icon-colored.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #080914;
+      --bg-card: rgba(18, 22, 38, 0.75);
+      --bg-card-hover: rgba(26, 32, 54, 0.9);
+      --border-subtle: rgba(255, 255, 255, 0.1);
+      --border-hover: rgba(255, 255, 255, 0.28);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary-neon: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-pink: #ec4899;
+      --glow-hero: rgba(168, 85, 247, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      selection-background-color: var(--accent-purple);
+    }
+
+    /* Ambient Cosmic Vignette */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 10% 40%, rgba(168, 85, 247, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 90% 70%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 50% 100%, rgba(15, 23, 42, 0.8) 0%, transparent 80%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Spread-out Background Stars Container */
+    #background-stars {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .bg-spread-star {
+      position: absolute;
+      opacity: 0.18;
+      animation: ambientStarFloat 10s ease-in-out infinite alternate;
+      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2));
+      transition: opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease;
+      will-change: transform, opacity;
+    }
+
+    @keyframes ambientStarFloat {
+      0% { transform: translateY(0) rotate(0deg) scale(0.92); opacity: 0.14; }
+      50% { transform: translateY(-22px) rotate(18deg) scale(1.08); opacity: 0.32; }
+      100% { transform: translateY(14px) rotate(-14deg) scale(0.96); opacity: 0.2; }
+    }
+
+    /* Layout Wrapper */
+    .container {
+      position: relative;
+      z-index: 2;
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* Header / Hero Section */
+    header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .hero-badge-wrap {
+      position: relative;
+      width: 104px;
+      height: 104px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero-badge-glow {
+      position: absolute;
+      inset: -15px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, rgba(56, 189, 248, 0.3) 40%, transparent 70%);
+      animation: heroGlowPulse 3.5s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes heroGlowPulse {
+      0% { transform: scale(0.85); opacity: 0.6; }
+      100% { transform: scale(1.35); opacity: 1; }
+    }
+
+    .hero-star-icon {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 8px 30px rgba(168, 85, 247, 0.7));
+      animation: heroStarFloat 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes heroStarFloat {
+      0% { transform: translateY(0) rotate(-3deg) scale(0.98); }
+      50% { transform: translateY(-10px) rotate(4deg) scale(1.04); }
+      100% { transform: translateY(5px) rotate(-2deg) scale(1); }
+    }
+
+    .site-title {
+      font-family: 'Orbitron', monospace, sans-serif;
+      font-size: clamp(38px, 6.5vw, 68px);
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff 0%, #38bdf8 35%, #c084fc 70%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 40px rgba(168, 85, 247, 0.35);
+    }
+
+    .site-subtitle {
+      font-size: clamp(16px, 2.2vw, 20px);
+      font-weight: 500;
+      color: var(--text-muted);
+      max-width: 680px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .hero-meta-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+    }
+
+    .meta-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      backdrop-filter: blur(10px);
+    }
+
+    .meta-tag-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-surprise {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 12px 26px;
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-radius: 9999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.45);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-surprise:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 8px 30px rgba(236, 72, 153, 0.6);
+      filter: brightness(1.1);
+    }
+
+    .btn-surprise:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    /* Controls Bar: Filter Tags & Search */
+    .controls-wrapper {
+      background: rgba(15, 19, 34, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 18px 24px;
+      margin-bottom: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .filter-tags {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .filter-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .filter-btn.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(168, 85, 247, 0.25));
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+    }
+
+    .search-box-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 240px;
+      max-width: 380px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(10, 12, 22, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 10px 18px 10px 42px;
+      border-radius: 9999px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+      background: rgba(15, 18, 32, 0.95);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      pointer-events: none;
+      font-size: 16px;
+    }
+
+    .games-counter {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    /* Games Showcase Grid (Spreaded Out) */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 32px;
+      margin-bottom: 60px;
+    }
+
+    @media (max-width: 480px) {
+      .games-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Individual Game Card */
+    .game-card {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      text-decoration: none;
+      color: inherit;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .game-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--card-border-glow, var(--border-hover));
+      transform: translateY(-8px) scale(1.015);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 35px var(--card-glow, rgba(255, 255, 255, 0.15));
+    }
+
+    /* Card Top Banner / Visual Header */
+    .card-banner {
+      position: relative;
+      height: 190px;
+      background: var(--card-banner-bg, #111827);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .banner-ambient-glow {
+      position: absolute;
+      inset: 0;
+      background: var(--card-ambient-gradient);
+      opacity: 0.4;
+      transition: opacity 0.35s ease, transform 0.5s ease;
+    }
+
+    .game-card:hover .banner-ambient-glow {
+      opacity: 0.75;
+      transform: scale(1.1);
+    }
+
+    /* Background decorative pattern in banner */
+    .banner-grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.6;
+    }
+
+    /* Star Icon Badge (Featuring icon.svg with game-specific gradient!) */
+    .card-icon-badge {
+      position: relative;
+      z-index: 2;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.4s ease;
+      filter: drop-shadow(0 6px 18px var(--card-glow));
+    }
+
+    .card-icon-badge svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .game-card:hover .card-icon-badge {
+      transform: scale(1.15) rotate(6deg);
+      filter: drop-shadow(0 10px 28px var(--card-glow));
+    }
+
+    /* Category Tag in Banner Corner */
+    .card-category-chip {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 3;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(10, 14, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      color: #e2e8f0;
+    }
+
+    .card-mode-badge {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      z-index: 3;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 3px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Card Content Area */
+    .card-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-description {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      flex: 1;
+    }
+
+    /* Controls & Features Pill Bar */
+    .card-meta-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .card-pill {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .card-pill kbd {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 10px;
+      color: #fff;
+    }
+
+    /* Action Play Button */
+    .card-play-btn {
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .game-card:hover .card-play-btn {
+      background: var(--card-btn-gradient, linear-gradient(135deg, #38bdf8, #818cf8));
+      border-color: transparent;
+      box-shadow: 0 4px 20px var(--card-glow);
+      transform: translateY(-2px);
+    }
+
+    .card-play-btn span {
+      transition: transform 0.2s ease;
+    }
+
+    .game-card:hover .card-play-btn span {
+      transform: translateX(4px);
+    }
+
+    /* Tips / Info Banner */
+    .hub-info-banner {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(56, 189, 248, 0.08));
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      border-radius: 20px;
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 60px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hub-info-icon {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.5));
+    }
+
+    .hub-info-text h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .hub-info-text p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    .hub-info-text kbd {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #64748b;
+      font-size: 13px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    footer a {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    footer a:hover {
+      color: #38bdf8;
+    }
+
+    .footer-star-bullet {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      vertical-align: middle;
+      margin: 0 4px;
+    }
+
+    /* No search results state */
+    #no-results {
+      display: none;
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    #no-results h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Reusable SVG Star Symbol from icon.svg -->
+  <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="star-icon" viewBox="0 0 200 200">
+      <path fill-rule="evenodd" d="M 33.2608789622268,149.7963776520648 A 25.17052382335184,103.73843372983761 59.891247 0,1 49.965078540340485,134.8178692216952 L 44.834624047034,134.8178692216952 L 33.2608789622268,149.7963776520648 M 50.659657478899916,127.27944069740559 L 44.834624047034,134.8178692216952 L 49.965078540340485,134.8178692216952 A 25.17052382335184,103.73843372983761 59.891247 0,1 52.54925836464416,132.755650750632 L 50.659657478899916,127.27944069740559 L 52.54925836464416,132.755650750632 A 25.17052382335184,103.73843372983761 59.891247 0,1 65.95421071044913,122.7667239656696 L 58.560741824553446,117.0533551703264 L 50.659657478899916,127.27944069740559 M 99.99981811713519,1.3965582468244975e-06 L 92.85580501989439,20.706222533318318 L 84.72268157144127,44.27988476201336 L 75.22601231950279,71.8033165093536 L 45.80785310857736,71.8033165093536 L 31.518798030143916,71.8033165093536 L 18.5384813560156,71.8033165093536 L -4.2095665619967804e-08,71.8033165093536 L 17.7737271793652,85.5371231624168 L 42.9767797933216,105.01143815090157 L 58.560741824553446,117.05335517032637 L 65.95421071044913,122.76672396566957 A 25.17052382335184,103.73843372983761 59.891247 0,1 71.42222339346192,118.97625799646556 A 25.17052382335184,103.73843372983761 59.891247 0,1 81.40089603152472,112.41105655128399 A 25.17052382335184,103.73843372983761 59.891247 0,1 81.98073656753577,112.04276962227996 A 25.17052382335184,103.73843372983761 59.891247 0,1 84.83639604612625,110.24741668720316 L 77.63757257605216,106.07328009060157 L 52.62762899051337,91.57063544404639 L 42.22278330215225,85.5371231624168 L 50.54594300421496,85.5371231624168 L 70.48792242386521,85.5371231624168 L 84.72319403098184,85.5371231624168 L 89.46128392661944,71.8033165093536 L 95.9614287818096,52.96416290681831 L 99.97318409807359,41.33561042283086 L 106.9025787432408,61.41844782211519 L 110.4855927641976,71.80331650935358 L 115.22368265983519,85.53712316241678 L 129.51223419968719,85.53712316241678 L 130.6150530782784,85.53712316241678 A 25.17052382335184,103.73843372983761 59.891247 0,1 135.363897685744,83.41035659603199 A 25.17052382335184,103.73843372983761 59.891247 0,1 152.57007864232241,76.50453310729517 A 25.17052382335184,103.73843372983761 59.891247 0,1 167.3882675251288,71.80331650935358 L 154.19229558523358,71.80331650935358 L 124.7741443040496,71.80331650935358 L 107.117712628508,20.628876826530245 L 99.99981811713519,1.3965582468244975e-06 M 156.60853,128.49552 A 95.595317,53.673533 88.408395 0,0 160.88217,147.06699 A 43.958293,16.620079 0.21703807 0,1 162.21077,150.55205 A 43.958293,16.620079 0.21703807 0,1 161.98546,150.57635000000002 A 95.595317,53.673533 88.408395 0,0 162.29344999999998,151.49877 A 95.595317,53.673533 88.408395 0,0 162.31824999999998,151.57267000000002 A 95.595317,53.673533 88.408395 0,0 169.15968999999998,167.80992 A 108.99035,60.91247 1.5775816 0,1 169.29043,167.91276 A 16.620079,43.958293 0.21703807 0,1 169.23872999999998,167.96186 A 95.595317,53.673533 88.408395 0,1 169.15962999999996,167.80993 A 108.99035,60.91247 1.5775816 0,0 156.52163999999996,159.47297 A 108.99035,60.91247 1.5775816 0,0 153.28772999999995,157.74491 A 108.99035,60.91247 1.5775816 0,0 151.66560999999996,156.92688 A 108.99035,60.91247 1.5775816 0,0 149.11640999999995,155.70266 A 108.99035,60.91247 1.5775816 0,0 145.89644999999996,154.25624000000002 A 108.99035,60.91247 1.5775816 0,0 131.15419999999995,148.83796 A 43.958293,16.620079 0.21703807 0,1 123.71072999999994,146.86909 A 43.958293,16.620079 0.21703807 0,1 122.25241999999994,146.37093 A 108.99035,60.91247 1.5775816 0,0 113.21316999999995,144.39121 A 108.99035,60.91247 1.5775816 0,0 86.63236799999996,141.25548 A 24.965841,95.405174 64.039403 0,1 84.24956799999995,142.22390000000001 A 24.965841,95.405174 64.039403 0,1 77.47013699999995,144.86146000000002 A 24.965841,95.405174 64.039403 0,1 37.45552499999995,156.04941000000002 A 122.7887,49.846216 4.5754829 0,1 75.97617099999995,155.41172000000003 A 122.7887,49.846216 4.5754829 0,1 84.19013999999996,155.93779000000004 A 122.7887,49.846216 4.5754829 0,1 114.37227999999996,159.83833000000004 A 122.7887,49.846216 4.5754829 0,1 127.03868999999996,162.46349000000004 A 122.7887,49.846216 4.5754829 0,1 139.58778999999996,165.73202000000003 A 122.7887,49.846216 4.5754829 0,1 143.76686999999995,166.98621000000003 A 122.7887,49.846216 4.5754829 0,1 149.24766999999994,168.77215000000004 A 122.7887,49.846216 4.5754829 0,1 178.08104999999995,181.75688000000005 A 122.7887,49.846216 4.5754829 0,1 185.56585999999996,186.72196000000005 A 122.7887,49.846216 4.5754829 0,1 190.03742999999997,190.29590000000005 A 53.673533,95.595317 6.6074741 0,1 174.65748999999997,159.55979000000005 A 53.673533,95.595317 6.6074741 0,1 172.26021999999998,149.20538000000005 A 53.673533,95.595317 6.6074741 0,1 171.39101999999997,143.99950000000004 A 53.673533,95.595317 6.6074741 0,1 170.52646999999996,136.87642000000005 A 43.958293,16.620079 0.21703807 0,0 156.60845999999995,128.49554000000006 L 156.60853,128.49552 M 172.33057,88.672107 A 24.965841,95.405174 64.039403 0,1 154.40091,103.99468999999999 A 95.595317,53.673533 88.408395 0,0 154.56473,109.11064999999999 A 95.595317,53.673533 88.408395 0,0 155.19362999999998,117.75974 A 95.595317,53.673533 88.408395 0,0 155.29491,118.75605999999999 A 16.620079,43.958293 0.21703807 0,1 155.64011,121.78119999999998 A 95.595317,53.673533 88.408395 0,0 156.60853,128.49551999999997 A 43.958293,16.620079 0.21703807 0,1 170.52654,136.87639999999996 A 53.673533,95.595317 6.6074741 0,1 169.83873,119.15241999999996 A 53.673533,95.595317 6.6074741 0,1 170.5932,105.81317999999996 A 53.673533,95.595317 6.6074741 0,1 172.93672999999998,89.66739499999996 A 16.620079,43.958293 0.21703807 0,0 172.33057,88.67210699999995 L 172.33057,88.672107 M 160.88217,147.06699 A 95.595317,53.673533 88.408395 0,0 161.98546,150.57634000000002 A 43.958293,16.620079 0.21703807 0,0 162.21077,150.55204 A 43.958293,16.620079 0.21703807 0,0 160.88217,147.06698 L 160.88217,147.06699 M 134.1205,102.51519 A 11.175629,10.942781 0.0 0,1 127.71261999999999,111.78698 A 13.971375,13.350425 0.0 0,0 132.69733,110.15865 A 13.971375,13.350425 0.0 0,0 130.79253,112.68200999999999 A 13.971375,13.350425 0.0 0,0 129.74402,114.95629 A 11.175629,10.942781 0.0 0,1 134.13445000000002,122.96355 A 11.175629,10.942781 0.0 0,1 136.61233000000001,116.70347 A 11.175629,10.942781 0.0 0,1 144.22582000000003,112.70474999999999 A 11.175629,10.942781 0.0 0,1 135.89558000000002,107.76292999999998 A 11.175629,10.942781 0.0 0,1 135.85628000000003,107.70352999999999 A 11.175629,10.942781 0.0 0,1 134.12047000000004,102.51521999999999 L 134.1205,102.51519 M 132.69733,110.15865 A 13.971375,13.350425 0.0 0,1 127.71261999999999,111.78698 A 11.175629,10.942781 0.0 0,1 127.47180999999999,111.89446 A 11.175629,10.942781 0.0 0,1 126.91008,112.11873999999999 A 11.175629,10.942781 0.0 0,1 124.02911999999999,112.77398999999998 A 11.175629,10.942781 0.0 0,1 127.86868,113.82767999999999 A 11.175629,10.942781 0.0 0,1 129.74402,114.95628999999998 A 13.971375,13.350425 0.0 0,1 130.79253,112.68200999999998 A 13.971375,13.350425 0.0 0,1 132.69733,110.15864999999998 L 132.69733,110.15865 M 105.23538,86.803516 A 19.923979,18.957594 0.0 0,1 100.03483,98.511373 A 19.923979,18.957594 0.0 0,1 95.22706,102.16645000000001 A 19.923979,18.957594 0.0 0,0 92.51072099999999,105.74962000000001 A 19.923979,18.957594 0.0 0,1 105.21546999999998,121.68934 A 15.937085,15.538741 0.0 0,1 105.20846999999998,121.22705 A 15.937085,15.538741 0.0 0,1 115.79012999999998,106.59204000000001 A 19.923979,18.957594 0.0 0,1 118.19180999999998,105.56325000000001 A 19.923979,18.957594 0.0 0,1 123.25085999999997,104.45593000000001 A 19.923979,18.957594 0.0 0,1 108.51509999999998,96.06267000000001 A 19.923979,18.957594 0.0 0,1 105.35586999999998,87.997414 A 19.923979,18.957594 0.0 0,1 105.23507999999998,86.803516 L 105.23538,86.803516 M 121.48212,116.9646 A 13.971375,13.350425 0.0 0,1 108.88288,129.47908 A 11.175629,10.942781 0.0 0,0 108.88788,129.48308 A 13.971375,13.350425 0.0 0,1 115.09938,131.53412 A 13.971375,13.350425 0.0 0,1 119.19991,135.39176 A 13.971375,13.350425 0.0 0,1 121.50003000000001,141.91178 A 13.971375,13.350425 0.0 0,1 125.14683000000001,133.6668 A 13.971375,13.350425 0.0 0,1 128.5182,131.09332 A 13.971375,13.350425 0.0 0,1 131.78984,129.80089 A 13.971375,13.350425 0.0 0,1 134.11631,129.39626 A 13.971375,13.350425 0.0 0,1 130.42299,128.56996 A 13.971375,13.350425 0.0 0,1 129.94137,128.38341 A 13.971375,13.350425 0.0 0,1 125.43208000000001,125.43475 A 13.971375,13.350425 0.0 0,1 121.48246000000002,116.96498 L 121.48212,116.9646 M 95.22706,102.16645 A 19.923979,18.957594 0.0 0,1 87.244574,104.57628 A 19.923979,18.957594 0.0 0,1 92.510721,105.74962 A 19.923979,18.957594 0.0 0,1 95.22706000000001,102.16645 L 95.22706,102.16645"/>
+    </symbol>
+
+    <!-- Linear Gradients for Each Game's Signature Aesthetic -->
+    <defs>
+      <!-- Hero Multi-gradient -->
+      <linearGradient id="grad-hero" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#38bdf8"/>
+        <stop offset="35%" stop-color="#c084fc"/>
+        <stop offset="70%" stop-color="#f472b6"/>
+        <stop offset="100%" stop-color="#fbbf24"/>
+      </linearGradient>
+
+      <!-- Pong: Neon Pink & Cyan Synthwave -->
+      <linearGradient id="grad-pong" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff4ecb"/>
+        <stop offset="50%" stop-color="#a44eff"/>
+        <stop offset="100%" stop-color="#4ee0ff"/>
+      </linearGradient>
+
+      <!-- Hell Arena: Demonic Fire Blood & Gold -->
+      <linearGradient id="grad-hell" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff5a3a"/>
+        <stop offset="45%" stop-color="#d3241a"/>
+        <stop offset="100%" stop-color="#e8b85a"/>
+      </linearGradient>
+
+      <!-- Stack Park: 4-Player Co-op Rainbow -->
+      <linearGradient id="grad-pico" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#e53935"/>
+        <stop offset="33%" stop-color="#fdd835"/>
+        <stop offset="66%" stop-color="#43a047"/>
+        <stop offset="100%" stop-color="#1e88e5"/>
+      </linearGradient>
+
+      <!-- Poolrooms: Liminal Water Turquoise & Teal -->
+      <linearGradient id="grad-pool" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#d9f6f4"/>
+        <stop offset="45%" stop-color="#2dd4bf"/>
+        <stop offset="100%" stop-color="#0b3a3f"/>
+      </linearGradient>
+
+      <!-- Slender: Pale Flashlight & Forest Mist -->
+      <linearGradient id="grad-slender" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#fff0d0"/>
+        <stop offset="45%" stop-color="#52796f"/>
+        <stop offset="100%" stop-color="#16211d"/>
+      </linearGradient>
+
+      <!-- Lighthouse: Golden Beam & Ocean Abyss -->
+      <linearGradient id="grad-lighthouse" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ffbe5a"/>
+        <stop offset="50%" stop-color="#38bdf8"/>
+        <stop offset="100%" stop-color="#1e1b4b"/>
+      </linearGradient>
+
+      <!-- 3D Hand: Sunset Coral & Royal Rose -->
+      <linearGradient id="grad-hand" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff9a6b"/>
+        <stop offset="50%" stop-color="#e8567a"/>
+        <stop offset="100%" stop-color="#7928ca"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Spread-out Background Stars Layer -->
+  <div id="background-stars"></div>
+
+  <div class="container">
+    <!-- Hero / Header -->
+    <header>
+      <div class="hero-badge-wrap">
+        <div class="hero-badge-glow"></div>
+        <svg class="hero-star-icon" viewBox="0 0 200 200">
+          <use href="#star-icon" fill="url(#grad-hero)"></use>
+        </svg>
+      </div>
+
+      <h1 class="site-title">You Got Games</h1>
+      <p class="site-subtitle">
+        Jump straight into retro synthwave arcades, retro raycasting shooters, liminal nightmares, and interactive 3D physics worlds.
+      </p>
+
+      <div class="hero-meta-bar">
+        <span class="meta-tag"><span class="meta-tag-dot"></span> 7 Games Ready</span>
+        <span class="meta-tag">⚡ In-Browser Instant Play</span>
+        <span class="meta-tag">🕹️ Single & Multi-Player</span>
+      </div>
+
+      <div class="hero-actions">
+        <button type="button" class="btn-surprise" id="randomGameBtn">
+          🎲 Surprise Me (Random Game)
+        </button>
+      </div>
+    </header>
+
+    <!-- Interactive Navigation / Filter Bar -->
+    <section class="controls-wrapper">
+      <div class="filter-tags">
+        <button class="filter-btn active" data-filter="all">All Games (7)</button>
+        <button class="filter-btn" data-filter="multiplayer">Multiplayer</button>
+        <button class="filter-btn" data-filter="action">Action & FPS</button>
+        <button class="filter-btn" data-filter="horror">Atmospheric Horror</button>
+        <button class="filter-btn" data-filter="3d">3D & Interactive</button>
+      </div>
+
+      <div class="search-box-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search games by title, genre, controls..." autocomplete="off">
+      </div>
+
+      <div class="games-counter" id="gameCountText">
+        Showing 7 of 7 games
+      </div>
+    </section>
+
+    <!-- Games Showcase Grid -->
+    <main class="games-grid" id="gamesGrid">
+
+      <!-- Game 1: PONG -->
+      <a href="games/pong.html" class="game-card" data-tags="all multiplayer action" style="--card-glow: rgba(255, 78, 203, 0.55); --card-border-glow: #ff4ecb; --card-banner-bg: #0a0a1e; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #ff4ecb, #4ee0ff); --card-btn-gradient: linear-gradient(135deg, #ff4ecb, #4ee0ff);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Arcade · Retro</span>
+          <span class="card-mode-badge">1 - 2 Players</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-pong)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Pong: Neon Edition</h2>
+          <p class="card-description">
+            High-octane neon cyber-pong featuring glowing particle trails, rally acceleration, screen shake, audio synthesis, and versus CPU or local 2-player mode.
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>W</kbd><kbd>S</kbd> P1</span>
+            <span class="card-pill"><kbd>↑</kbd><kbd>↓</kbd> P2</span>
+            <span class="card-pill"><kbd>Space</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 2: HELL ARENA -->
+      <a href="games/hell-arena.html" class="game-card" data-tags="all action horror 3d" style="--card-glow: rgba(229, 39, 26, 0.65); --card-border-glow: #e5271a; --card-banner-bg: #180806; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #ff3a2b, #8a5a34); --card-btn-gradient: linear-gradient(135deg, #d3241a, #e8b85a);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Retro FPS Raycaster</span>
+          <span class="card-mode-badge">Single Player</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-hell)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Hell Arena</h2>
+          <p class="card-description">
+            DOOM-style retro raycasting first-person shooter. Blast through infinite demon hordes with your shotgun, dodge hellfire, watch the minimap radar, and survive the waves.
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>WASD</kbd> Move</span>
+            <span class="card-pill"><kbd>Mouse</kbd> Aim & Shoot</span>
+            <span class="card-pill"><kbd>Esc</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 3: STACK PARK -->
+      <a href="games/pico.html" class="game-card" data-tags="all multiplayer action" style="--card-glow: rgba(67, 160, 71, 0.65); --card-border-glow: #43a047; --card-banner-bg: #091410; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #43a047, #fdd835); --card-btn-gradient: linear-gradient(135deg, #e53935, #43a047);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Co-op Platformer</span>
+          <span class="card-mode-badge">1 - 4 Players</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-pico)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Stack Park</h2>
+          <p class="card-description">
+            4 players on one keyboard! Stack atop each other, form human stepping-stone bridges, push buddies over cliffs, hit switches, and reach the exit together.
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>WAD</kbd> P1</span>
+            <span class="card-pill"><kbd>Arrows</kbd> P2</span>
+            <span class="card-pill"><kbd>IJL</kbd> P3</span>
+            <span class="card-pill"><kbd>TFH</kbd> P4</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 4: THE POOLROOMS -->
+      <a href="games/poolrooms.html" class="game-card" data-tags="all horror 3d" style="--card-glow: rgba(45, 212, 191, 0.6); --card-border-glow: #2dd4bf; --card-banner-bg: #082226; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #2dd4bf, #0b2226); --card-btn-gradient: linear-gradient(135deg, #2dd4bf, #0d5f66);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Liminal Horror 3D</span>
+          <span class="card-mode-badge">Single Player</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-pool)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">The Poolrooms</h2>
+          <p class="card-description">
+            Level 37 of the Backrooms. Wander endless warm tiled swimming pools and foggy abysses with volumetric godrays, realistic water physics, and the colossus Leviathan lurking below.
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>WASD</kbd> Wade</span>
+            <span class="card-pill"><kbd>Shift</kbd> Sprint</span>
+            <span class="card-pill"><kbd>Mouse</kbd> Look</span>
+            <span class="card-pill"><kbd>Esc</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 5: EIGHT PAGES -->
+      <a href="games/slender.html" class="game-card" data-tags="all horror 3d" style="--card-glow: rgba(255, 240, 208, 0.5); --card-border-glow: #94a3b8; --card-banner-bg: #0c120f; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #52796f, #000000); --card-btn-gradient: linear-gradient(135deg, #fff0d0, #52796f);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Survival Horror</span>
+          <span class="card-mode-badge">Single Player</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-slender)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Eight Pages</h2>
+          <p class="card-description">
+            A midnight forest, a dying flashlight beam, and static television distortion that builds as a tall faceless presence draws closer. Can you locate all 8 pages before losing sanity?
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>WASD</kbd> Move</span>
+            <span class="card-pill"><kbd>Shift</kbd> Run</span>
+            <span class="card-pill"><kbd>E</kbd> Take Page</span>
+            <span class="card-pill"><kbd>Esc</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 6: LIGHTHOUSE · PARTICLE OCEAN -->
+      <a href="games/lighthouse-particle-ocean.html" class="game-card" data-tags="all 3d" style="--card-glow: rgba(255, 190, 90, 0.6); --card-border-glow: #ffbe5a; --card-banner-bg: #080f1e; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #ffbe5a, #1e1b4b); --card-btn-gradient: linear-gradient(135deg, #ffbe5a, #38bdf8);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">3D Simulation</span>
+          <span class="card-mode-badge">Interactive</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-lighthouse)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Lighthouse · Particle Ocean</h2>
+          <p class="card-description">
+            Cinematic WebGL simulation featuring over 160,000 Gerstner wave particles rolling across an endless sea beneath a sweeping lighthouse beam, bokeh depth of field, and free orbit camera.
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>Drag</kbd> Orbit</span>
+            <span class="card-pill"><kbd>Scroll</kbd> Zoom</span>
+            <span class="card-pill"><kbd>Esc / P</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- Game 7: ARTICULATED 3D HAND -->
+      <a href="games/hand.html" class="game-card" data-tags="all 3d" style="--card-glow: rgba(232, 86, 122, 0.6); --card-border-glow: #e8567a; --card-banner-bg: #141724; --card-ambient-gradient: radial-gradient(circle at 50% 50%, #ff9a6b, #e8567a); --card-btn-gradient: linear-gradient(135deg, #ff9a6b, #7928ca);">
+        <div class="card-banner">
+          <div class="banner-ambient-glow"></div>
+          <div class="banner-grid-overlay"></div>
+          <span class="card-category-chip">Kinematics Demo</span>
+          <span class="card-mode-badge">Interactive 3D</span>
+          <div class="card-icon-badge">
+            <svg viewBox="0 0 200 200"><use href="#star-icon" fill="url(#grad-hand)"></use></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Articulated 3D Hand</h2>
+          <p class="card-description">
+            Fully articulated anatomical 3D hand with 17 movable joints, organic exponential easing, rounded phalanges, fingernails, and procedural gestures (Grab, Release, Point).
+          </p>
+          <div class="card-meta-list">
+            <span class="card-pill"><kbd>Pose Buttons</kbd> Gesture</span>
+            <span class="card-pill"><kbd>Drag</kbd> Rotate</span>
+            <span class="card-pill"><kbd>Esc / P</kbd> Pause</span>
+          </div>
+          <button class="card-play-btn" type="button">
+            Play Game <span>→</span>
+          </button>
+        </div>
+      </a>
+
+      <!-- No Results State -->
+      <div id="no-results">
+        <h3>No games match your query</h3>
+        <p>Try searching for a different keyword or reset your category filter.</p>
+      </div>
+    </main>
+
+    <!-- Navigation & In-Game Controls Info Banner -->
+    <section class="hub-info-banner">
+      <svg class="hub-info-icon" viewBox="0 0 200 200">
+        <use href="#star-icon" fill="url(#grad-hero)"></use>
+      </svg>
+      <div class="hub-info-text">
+        <h3>Universal In-Game Hub Navigation</h3>
+        <p>
+          Every game is integrated with a floating <kbd>← Menu</kbd> button in the top-left corner.
+          Press <kbd>Esc</kbd> or <kbd>P</kbd> in any game to pause and open the pause overlay, where you can inspect controls, resume, or return directly to this hub!
+        </p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div>
+        <strong>You Got Games</strong> · Arcade Portal
+        <span class="footer-star-bullet">
+          <svg viewBox="0 0 200 200"><use href="#star-icon" fill="#38bdf8"></use></svg>
+        </span>
+        All games running 100% locally in your browser.
+      </div>
+      <div>
+        <a href="#top" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">Back to Top ↑</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // ─── 1. SPREAD OUT BACKGROUND STAR ICONS ─────────────────────────
+    (function initSpreadBackgroundStars() {
+      const container = document.getElementById('background-stars');
+      if (!container) return;
+
+      const starGradients = [
+        'url(#grad-pong)',
+        'url(#grad-hell)',
+        'url(#grad-pico)',
+        'url(#grad-pool)',
+        'url(#grad-slender)',
+        'url(#grad-lighthouse)',
+        'url(#grad-hand)',
+        'url(#grad-hero)'
+      ];
+
+      // Generate 22 spread-out decorative stars across the background
+      const STAR_COUNT = 22;
+      const frag = document.createDocumentFragment();
+
+      for (let i = 0; i < STAR_COUNT; i++) {
+        const star = document.createElement('div');
+        star.className = 'bg-spread-star';
+
+        const size = Math.floor(28 + Math.random() * 64);
+        const top = Math.floor(Math.random() * 95);
+        const left = Math.floor(Math.random() * 96);
+        const grad = starGradients[i % starGradients.length];
+        const duration = (7 + Math.random() * 8).toFixed(1);
+        const delay = (-Math.random() * 10).toFixed(1);
+        const initialOpacity = (0.10 + Math.random() * 0.16).toFixed(2);
+
+        star.style.width = size + 'px';
+        star.style.height = size + 'px';
+        star.style.top = top + '%';
+        star.style.left = left + '%';
+        star.style.opacity = initialOpacity;
+        star.style.animationDuration = duration + 's';
+        star.style.animationDelay = delay + 's';
+
+        star.innerHTML = `
+          <svg viewBox="0 0 200 200" style="width:100%;height:100%;">
+            <use href="#star-icon" fill="${grad}"></use>
+          </svg>
+        `;
+
+        frag.appendChild(star);
+      }
+
+      container.appendChild(frag);
+    })();
+
+    // ─── 2. SEARCH & FILTERING ──────────────────────────────────────
+    const searchInput = document.getElementById('searchInput');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const cards = Array.from(document.querySelectorAll('.game-card'));
+    const counterText = document.getElementById('gameCountText');
+    const noResults = document.getElementById('no-results');
+
+    let activeFilter = 'all';
+    let searchQuery = '';
+
+    function applyFilterAndSearch() {
+      let visibleCount = 0;
+
+      cards.forEach(card => {
+        const tags = (card.getAttribute('data-tags') || '').split(' ');
+        const title = card.querySelector('.card-title').textContent.toLowerCase();
+        const desc = card.querySelector('.card-description').textContent.toLowerCase();
+        const pills = card.querySelector('.card-meta-list').textContent.toLowerCase();
+
+        const matchesFilter = (activeFilter === 'all') || tags.includes(activeFilter);
+        const query = searchQuery.trim().toLowerCase();
+        const matchesSearch = !query || title.includes(query) || desc.includes(query) || pills.includes(query);
+
+        if (matchesFilter && matchesSearch) {
+          card.style.display = 'flex';
+          visibleCount++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      counterText.textContent = `Showing ${visibleCount} of ${cards.length} games`;
+      noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.getAttribute('data-filter') || 'all';
+        applyFilterAndSearch();
+      });
+    });
+
+    searchInput.addEventListener('input', e => {
+      searchQuery = e.target.value;
+      applyFilterAndSearch();
+    });
+
+    // ─── 3. RANDOM GAME PICKER ──────────────────────────────────────
+    document.getElementById('randomGameBtn').addEventListener('click', () => {
+      const visibleCards = cards.filter(c => c.style.display !== 'none');
+      const pool = visibleCards.length > 0 ? visibleCards : cards;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      if (pick) {
+        pick.style.transform = 'scale(1.06)';
+        pick.style.boxShadow = '0 0 50px rgba(56, 189, 248, 0.9)';
+        setTimeout(() => {
+          window.location.href = pick.getAttribute('href');
+        }, 300);
+      }
+    });
+  </script>
+</body>
+</html>
