@@ -95,17 +95,41 @@
       c1: '#ffbe5a',
       c2: '#38bdf8'
     },
-    'hand': {
-      title: 'Articulated 3D Hand',
-      subtitle: 'Procedural Kinematics & Poses',
+    'arrower': {
+      title: 'Arrower',
+      subtitle: '3D Isometric Bow Arena · Multiplayer Shooter',
       stops: [
-        { offset: '0%', color: '#ff9a6b' },
-        { offset: '50%', color: '#e8567a' },
-        { offset: '100%', color: '#7928ca' }
+        { offset: '0%', color: '#ff6b4a' },
+        { offset: '50%', color: '#ffcf5a' },
+        { offset: '100%', color: '#2fd6b8' }
       ],
-      glow: 'rgba(232, 86, 122, 0.65)',
-      c1: '#ff9a6b',
-      c2: '#7928ca'
+      glow: 'rgba(255, 107, 74, 0.65)',
+      c1: '#ff6b4a',
+      c2: '#2fd6b8'
+    },
+    'hand-simulation': {
+      title: 'Hand Simulation',
+      subtitle: 'MediaPipe AI Vision · Holographic 3D Kinematics',
+      stops: [
+        { offset: '0%', color: '#5ae0ff' },
+        { offset: '50%', color: '#0099ff' },
+        { offset: '100%', color: '#0a1e3f' }
+      ],
+      glow: 'rgba(90, 224, 255, 0.65)',
+      c1: '#5ae0ff',
+      c2: '#0099ff'
+    },
+    'hand': {
+      title: 'Hand Simulation',
+      subtitle: 'MediaPipe AI Vision · Holographic 3D Kinematics',
+      stops: [
+        { offset: '0%', color: '#5ae0ff' },
+        { offset: '50%', color: '#0099ff' },
+        { offset: '100%', color: '#0a1e3f' }
+      ],
+      glow: 'rgba(90, 224, 255, 0.65)',
+      c1: '#5ae0ff',
+      c2: '#0099ff'
     }
   };
 
@@ -147,13 +171,15 @@
 
     detectGameId() {
       const path = window.location.pathname.toLowerCase();
+      if (path.includes('arrower')) return 'arrower';
+      if (path.includes('hand-simulation')) return 'hand-simulation';
       if (path.includes('hell-arena')) return 'hell-arena';
       if (path.includes('pong')) return 'pong';
       if (path.includes('pico')) return 'pico';
       if (path.includes('poolrooms')) return 'poolrooms';
       if (path.includes('slender')) return 'slender';
       if (path.includes('lighthouse')) return 'lighthouse';
-      if (path.includes('hand')) return 'hand';
+      if (path.includes('hand')) return 'hand-simulation';
       return 'pong';
     }
 

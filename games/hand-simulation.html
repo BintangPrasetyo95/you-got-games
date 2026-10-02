@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Holographic Hand Simulation</title>
+<link rel="stylesheet" href="hub-nav.css">
+<style>
+  :root {
+    --hub-c1: #2fd4ff;
+    --hub-c2: #0077ff;
+    --hub-glow: rgba(90, 220, 255, 0.4);
+  }
+  html,body{margin:0;height:100%;overflow:hidden;color:#bfeaff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:radial-gradient(ellipse at 50% 35%,#0f1c33 0%,#070b14 55%,#03050a 100%)}
+  #gl{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+  #pip{position:fixed;right:18px;bottom:18px;width:208px;height:156px;object-fit:cover;transform:scaleX(-1);z-index:2;
+    border-radius:14px;border:1px solid rgba(90,220,255,.35);box-shadow:0 10px 30px rgba(0,0,0,.6);opacity:.8;background:#000}
+  #hint{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);padding:8px 18px;border-radius:99px;font-size:13px;
+    background:rgba(10,20,36,.6);border:1px solid rgba(90,220,255,.25);backdrop-filter:blur(6px);transition:opacity .6s;opacity:0;pointer-events:none;z-index:2;}
+  #load{position:fixed;inset:0;z-index:1500;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;
+    text-align:center;padding:24px;background:radial-gradient(circle at 50% 40%,#0c1830,#03050a);transition:opacity .9s}
+  #load.hide{opacity:0;pointer-events:none}
+  .ring{width:46px;height:46px;border-radius:50%;border:3px solid rgba(90,220,255,.15);border-top-color:#5ae0ff;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #sub{font-size:12px;opacity:.75;max-width:440px;line-height:1.5}
+
+  #panel{position:fixed;top:18px;left:18px;z-index:3;display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-radius:18px;max-width:260px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.45);
+    backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
+  #mode{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;font-size:14px;font-weight:600;color:#e6f7ff}
+  #mode:focus-visible{outline:2px solid #5ae0ff;outline-offset:6px;border-radius:8px}
+  #mode i{position:relative;flex:none;width:42px;height:24px;border-radius:99px;background:rgba(255,255,255,.18);transition:background .25s}
+  #mode i::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .25s}
+  #mode[aria-checked=true] i{background:#2fd4ff}
+  #mode[aria-checked=true] i::after{transform:translateX(18px)}
+  #legend{font-size:12px;line-height:1.7;opacity:.65}
+  #gf{position:fixed;left:50%;top:16%;z-index:4;transform:translateX(-50%);opacity:0;pointer-events:none;font-size:32px;font-weight:700;color:#fff;
+    text-shadow:0 0 24px rgba(90,220,255,.9),0 2px 12px rgba(0,0,0,.6)}
+  #gf.on{animation:pop 1.2s ease-out}
+  @keyframes pop{0%{opacity:0;transform:translateX(-50%) scale(.8)}15%{opacity:1;transform:translateX(-50%) scale(1.05)}
+    70%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-14px)}}
+
+  /* ---------- In-game HUD Menu Button ---------- */
+  .hand-hud-btn {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 16px 8px 12px;
+    background: rgba(10, 18, 36, 0.88);
+    border: 1px solid rgba(90, 220, 255, 0.35);
+    border-radius: 9999px;
+    color: #e6f7ff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+  }
+  .hand-hud-btn:hover {
+    background: rgba(18, 32, 60, 0.95);
+    border-color: #5ae0ff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  }
+  .hand-hud-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  .hand-hud-star svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .hand-hud-btn kbd {
+    background: rgba(90, 220, 255, 0.18);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-family: monospace;
+    color: #5ae0ff;
+  }
+
+  /* ---------- Overlay Menus (Start & Pause) ---------- */
+  .hand-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(4, 8, 16, 0.88);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #fff;
+    user-select: none;
+    overflow-y: auto;
+  }
+  .hand-card {
+    background: radial-gradient(ellipse at 50% 0%, rgba(20, 44, 76, 0.82) 0%, rgba(8, 16, 32, 0.96) 100%);
+    border: 1px solid rgba(90, 220, 255, 0.3);
+    border-radius: 28px;
+    padding: 36px 42px;
+    max-width: 580px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(90, 220, 255, 0.15);
+    animation: handCardPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes handCardPop {
+    0% { transform: scale(0.92) translateY(16px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .hand-star-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hand-star-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: none !important;
+  }
+  .hand-btn-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .hand-btn-star svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .hand-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .hand-panel-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .hand-panel-star svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .hand-panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8fe9ff;
+  }
+  .hand-title {
+    font-size: clamp(24px, 3.8vw, 34px);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+    color: #ffffff;
+    text-shadow: 0 2px 14px rgba(90, 220, 255, 0.4);
+  }
+  .hand-sub {
+    font-size: 14px;
+    font-weight: 500;
+    color: #8fe9ff;
+    letter-spacing: 0.05em;
+    margin: 0 0 20px;
+  }
+  .hand-desc {
+    font-size: 14px;
+    line-height: 1.55;
+    color: rgba(220, 240, 255, 0.82);
+    margin-bottom: 22px;
+  }
+  .hand-gestures-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
+    text-align: left;
+  }
+  .hand-gestures-compact {
+    grid-template-columns: repeat(2, 1fr);
+    margin-bottom: 18px;
+  }
+  .hand-gesture-card {
+    background: rgba(90, 220, 255, 0.06);
+    border: 1px solid rgba(90, 220, 255, 0.18);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hand-gesture-icon {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .hand-gesture-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .hand-gesture-info b {
+    font-size: 13px;
+    color: #e6f7ff;
+    letter-spacing: 0.02em;
+  }
+  .hand-gesture-info span {
+    font-size: 11px;
+    color: rgba(190, 234, 255, 0.7);
+    line-height: 1.2;
+  }
+  .hand-mode-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: rgba(220, 240, 255, 0.85);
+  }
+  .hand-mode-toggles {
+    display: flex;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 3px;
+    border-radius: 99px;
+    border: 1px solid rgba(90, 220, 255, 0.2);
+  }
+  .hand-mode-opt {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.65);
+    padding: 5px 14px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .hand-mode-opt.active {
+    background: #2fd4ff;
+    color: #030c1a;
+  }
+  .hand-privacy-note {
+    font-size: 11px;
+    color: rgba(190, 234, 255, 0.6);
+    line-height: 1.4;
+    margin-bottom: 22px;
+  }
+  .hand-pause-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .hand-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: rgba(90, 220, 255, 0.1);
+    border: 1px solid rgba(90, 220, 255, 0.25);
+    border-radius: 10px;
+    color: #bfeaff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .hand-action-btn:hover {
+    background: rgba(90, 220, 255, 0.2);
+    border-color: #5ae0ff;
+    color: #fff;
+    transform: translateY(-1px);
+  }
+  .hand-action-btn b {
+    color: #2fd4ff;
+  }
+  .hand-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+</style>
+</head>
+<body>
+<!-- Reusable SVG Star Symbol from icon.svg (Active, Non-hidden Paint Server) -->
+<svg style="position:absolute; width:0; height:0; overflow:hidden; pointer-events:none;" aria-hidden="true">
+  <symbol id="star-path" viewBox="0 0 200 200">
+    <path fill-rule="evenodd" d="M 33.2608789622268,149.7963776520648 A 25.17052382335184,103.73843372983761 59.891247 0,1 49.965078540340485,134.8178692216952 L 44.834624047034,134.8178692216952 L 33.2608789622268,149.7963776520648 M 50.659657478899916,127.27944069740559 L 44.834624047034,134.8178692216952 L 49.965078540340485,134.8178692216952 A 25.17052382335184,103.73843372983761 59.891247 0,1 52.54925836464416,132.755650750632 L 50.659657478899916,127.27944069740559 L 52.54925836464416,132.755650750632 A 25.17052382335184,103.73843372983761 59.891247 0,1 65.95421071044913,122.7667239656696 L 58.560741824553446,117.0533551703264 L 50.659657478899916,127.27944069740559 M 99.99981811713519,1.3965582468244975e-06 L 92.85580501989439,20.706222533318318 L 84.72268157144127,44.27988476201336 L 75.22601231950279,71.8033165093536 L 45.80785310857736,71.8033165093536 L 31.518798030143916,71.8033165093536 L 18.5384813560156,71.8033165093536 L -4.2095665619967804e-08,71.8033165093536 L 17.7737271793652,85.5371231624168 L 42.9767797933216,105.01143815090157 L 58.560741824553446,117.05335517032637 L 65.95421071044913,122.76672396566957 A 25.17052382335184,103.73843372983761 59.891247 0,1 71.42222339346192,118.97625799646556 A 25.17052382335184,103.73843372983761 59.891247 0,1 81.40089603152472,112.41105655128399 A 25.17052382335184,103.73843372983761 59.891247 0,1 81.98073656753577,112.04276962227996 A 25.17052382335184,103.73843372983761 59.891247 0,1 84.83639604612625,110.24741668720316 L 77.63757257605216,106.07328009060157 L 52.62762899051337,91.57063544404639 L 42.22278330215225,85.5371231624168 L 50.54594300421496,85.5371231624168 L 70.48792242386521,85.5371231624168 L 84.72319403098184,85.5371231624168 L 89.46128392661944,71.8033165093536 L 95.9614287818096,52.96416290681831 L 99.97318409807359,41.33561042283086 L 106.9025787432408,61.41844782211519 L 110.4855927641976,71.80331650935358 L 115.22368265983519,85.53712316241678 L 129.51223419968719,85.53712316241678 L 130.6150530782784,85.53712316241678 A 25.17052382335184,103.73843372983761 59.891247 0,1 135.363897685744,83.41035659603199 A 25.17052382335184,103.73843372983761 59.891247 0,1 152.57007864232241,76.50453310729517 A 25.17052382335184,103.73843372983761 59.891247 0,1 167.3882675251288,71.80331650935358 L 154.19229558523358,71.80331650935358 L 124.7741443040496,71.80331650935358 L 107.117712628508,20.628876826530245 L 99.99981811713519,1.3965582468244975e-06 M 156.60853,128.49552 A 95.595317,53.673533 88.408395 0,0 160.88217,147.06699 A 43.958293,16.620079 0.21703807 0,1 162.21077,150.55205 A 43.958293,16.620079 0.21703807 0,1 161.98546,150.57635000000002 A 95.595317,53.673533 88.408395 0,0 162.29344999999998,151.49877 A 95.595317,53.673533 88.408395 0,0 162.31824999999998,151.57267000000002 A 95.595317,53.673533 88.408395 0,0 169.15968999999998,167.80992 A 108.99035,60.91247 1.5775816 0,1 169.29043,167.91276 A 16.620079,43.958293 0.21703807 0,1 169.23872999999998,167.96186 A 95.595317,53.673533 88.408395 0,1 169.15962999999996,167.80993 A 108.99035,60.91247 1.5775816 0,0 156.52163999999996,159.47297 A 108.99035,60.91247 1.5775816 0,0 153.28772999999995,157.74491 A 108.99035,60.91247 1.5775816 0,0 151.66560999999996,156.92688 A 108.99035,60.91247 1.5775816 0,0 149.11640999999995,155.70266 A 108.99035,60.91247 1.5775816 0,0 145.89644999999996,154.25624000000002 A 108.99035,60.91247 1.5775816 0,0 131.15419999999995,148.83796 A 43.958293,16.620079 0.21703807 0,1 123.71072999999994,146.86909 A 43.958293,16.620079 0.21703807 0,1 122.25241999999994,146.37093 A 108.99035,60.91247 1.5775816 0,0 113.21316999999995,144.39121 A 108.99035,60.91247 1.5775816 0,0 86.63236799999996,141.25548 A 24.965841,95.405174 64.039403 0,1 84.24956799999995,142.22390000000001 A 24.965841,95.405174 64.039403 0,1 77.47013699999995,144.86146000000002 A 24.965841,95.405174 64.039403 0,1 37.45552499999995,156.04941000000002 A 122.7887,49.846216 4.5754829 0,1 75.97617099999995,155.41172000000003 A 122.7887,49.846216 4.5754829 0,1 84.19013999999996,155.93779000000004 A 122.7887,49.846216 4.5754829 0,1 114.37227999999996,159.83833000000004 A 122.7887,49.846216 4.5754829 0,1 127.03868999999996,162.46349000000004 A 122.7887,49.846216 4.5754829 0,1 139.58778999999996,165.73202000000003 A 122.7887,49.846216 4.5754829 0,1 143.76686999999995,166.98621000000003 A 122.7887,49.846216 4.5754829 0,1 149.24766999999994,168.77215000000004 A 122.7887,49.846216 4.5754829 0,1 178.08104999999995,181.75688000000005 A 122.7887,49.846216 4.5754829 0,1 185.56585999999996,186.72196000000005 A 122.7887,49.846216 4.5754829 0,1 190.03742999999997,190.29590000000005 A 53.673533,95.595317 6.6074741 0,1 174.65748999999997,159.55979000000005 A 53.673533,95.595317 6.6074741 0,1 172.26021999999998,149.20538000000005 A 53.673533,95.595317 6.6074741 0,1 171.39101999999997,143.99950000000004 A 53.673533,95.595317 6.6074741 0,1 170.52646999999996,136.87642000000005 A 43.958293,16.620079 0.21703807 0,0 156.60845999999995,128.49554000000006 L 156.60853,128.49552 M 172.33057,88.672107 A 24.965841,95.405174 64.039403 0,1 154.40091,103.99468999999999 A 95.595317,53.673533 88.408395 0,0 154.56473,109.11064999999999 A 95.595317,53.673533 88.408395 0,0 155.19362999999998,117.75974 A 95.595317,53.673533 88.408395 0,0 155.29491,118.75605999999999 A 16.620079,43.958293 0.21703807 0,1 155.64011,121.78119999999998 A 95.595317,53.673533 88.408395 0,0 156.60853,128.49551999999997 A 43.958293,16.620079 0.21703807 0,1 170.52654,136.87639999999996 A 53.673533,95.595317 6.6074741 0,1 169.83873,119.15241999999996 A 53.673533,95.595317 6.6074741 0,1 170.5932,105.81317999999996 A 53.673533,95.595317 6.6074741 0,1 172.93672999999998,89.66739499999996 A 16.620079,43.958293 0.21703807 0,0 172.33057,88.67210699999995 L 172.33057,88.672107 M 160.88217,147.06699 A 95.595317,53.673533 88.408395 0,0 161.98546,150.57634000000002 A 43.958293,16.620079 0.21703807 0,0 162.21077,150.55204 A 43.958293,16.620079 0.21703807 0,0 160.88217,147.06698 L 160.88217,147.06699 M 134.1205,102.51519 A 11.175629,10.942781 0.0 0,1 127.71261999999999,111.78698 A 13.971375,13.350425 0.0 0,0 132.69733,110.15865 A 13.971375,13.350425 0.0 0,0 130.79253,112.68200999999999 A 13.971375,13.350425 0.0 0,0 129.74402,114.95629 A 11.175629,10.942781 0.0 0,1 134.13445000000002,122.96355 A 11.175629,10.942781 0.0 0,1 136.61233000000001,116.70347 A 11.175629,10.942781 0.0 0,1 144.22582000000003,112.70474999999999 A 11.175629,10.942781 0.0 0,1 135.89558000000002,107.76292999999998 A 11.175629,10.942781 0.0 0,1 135.85628000000003,107.70352999999999 A 11.175629,10.942781 0.0 0,1 134.12047000000004,102.51521999999999 L 134.1205,102.51519 M 132.69733,110.15865 A 13.971375,13.350425 0.0 0,1 127.71261999999999,111.78698 A 11.175629,10.942781 0.0 0,1 127.47180999999999,111.89446 A 11.175629,10.942781 0.0 0,1 126.91008,112.11873999999999 A 11.175629,10.942781 0.0 0,1 124.02911999999999,112.77398999999998 A 11.175629,10.942781 0.0 0,1 127.86868,113.82767999999999 A 11.175629,10.942781 0.0 0,1 129.74402,114.95628999999998 A 13.971375,13.350425 0.0 0,1 130.79253,112.68200999999998 A 13.971375,13.350425 0.0 0,1 132.69733,110.15864999999998 L 132.69733,110.15865 M 105.23538,86.803516 A 19.923979,18.957594 0.0 0,1 100.03483,98.511373 A 19.923979,18.957594 0.0 0,1 95.22706,102.16645000000001 A 19.923979,18.957594 0.0 0,0 92.51072099999999,105.74962000000001 A 19.923979,18.957594 0.0 0,1 105.21546999999998,121.68934 A 15.937085,15.538741 0.0 0,1 105.20846999999998,121.22705 A 15.937085,15.538741 0.0 0,1 115.79012999999998,106.59204000000001 A 19.923979,18.957594 0.0 0,1 118.19180999999998,105.56325000000001 A 19.923979,18.957594 0.0 0,1 123.25085999999997,104.45593000000001 A 19.923979,18.957594 0.0 0,1 108.51509999999998,96.06267000000001 A 19.923979,18.957594 0.0 0,1 105.35586999999998,87.997414 A 19.923979,18.957594 0.0 0,1 105.23507999999998,86.803516 L 105.23538,86.803516 M 121.48212,116.9646 A 13.971375,13.350425 0.0 0,1 108.88288,129.47908 A 11.175629,10.942781 0.0 0,0 108.88788,129.48308 A 13.971375,13.350425 0.0 0,1 115.09938,131.53412 A 13.971375,13.350425 0.0 0,1 119.19991,135.39176 A 13.971375,13.350425 0.0 0,1 121.50003000000001,141.91178 A 13.971375,13.350425 0.0 0,1 125.14683000000001,133.6668 A 13.971375,13.350425 0.0 0,1 128.5182,131.09332 A 13.971375,13.350425 0.0 0,1 131.78984,129.80089 A 13.971375,13.350425 0.0 0,1 134.11631,129.39626 A 13.971375,13.350425 0.0 0,1 130.42299,128.56996 A 13.971375,13.350425 0.0 0,1 129.94137,128.38341 A 13.971375,13.350425 0.0 0,1 125.43208000000001,125.43475 A 13.971375,13.350425 0.0 0,1 121.48246000000002,116.96498 L 121.48212,116.9646 M 95.22706,102.16645 A 19.923979,18.957594 0.0 0,1 87.244574,104.57628 A 19.923979,18.957594 0.0 0,1 92.510721,105.74962 A 19.923979,18.957594 0.0 0,1 95.22706000000001,102.16645 L 95.22706,102.16645" />
+  </symbol>
+  <defs>
+    <!-- Cyan to Electric Blue to Deep Abyss Star Gradient -->
+    <linearGradient id="handStarGrad" x1="0%" y1="0%" x2="100%" y2="100%" gradientTransform="rotate(45)">
+      <stop offset="0%" stop-color="#5ae0ff"/>
+      <stop offset="50%" stop-color="#0099ff"/>
+      <stop offset="100%" stop-color="#0a1e3f"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<canvas id="gl"></canvas>
+<video id="pip" playsinline muted autoplay></video>
+
+<!-- Top-Right HUD Menu Button -->
+<button id="handMenuBtn" type="button" class="hand-hud-btn" title="Open Menu (Esc or P)">
+  <span class="hand-hud-star">
+    <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+  </span>
+  <span>Menu</span>
+  <kbd>Esc</kbd>
+</button>
+
+<!-- Start Menu Screen -->
+<div id="handStartMenu" class="hand-overlay">
+  <div class="hand-card">
+    <div id="hand-start-icon" class="hand-star-icon">
+      <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+    </div>
+    <h1 class="hand-title">HAND SIMULATION</h1>
+    <p class="hand-sub">MediaPipe AI Vision · Holographic 3D Kinematics</p>
+    <p class="hand-desc">
+      Control an articulated holographic 3D hand directly through your camera. Pinch to grab quantum cubes, perform gestures to spawn matter, or shift atmospheric lighting.
+    </p>
+
+    <!-- Gestures showcase -->
+    <div class="hand-gestures-grid">
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">✌️</div>
+        <div class="hand-gesture-info">
+          <b>Peace Sign</b>
+          <span>Spawn kinetic quantum cube</span>
+        </div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">🤏</div>
+        <div class="hand-gesture-info">
+          <b>Pinch Grip</b>
+          <span>Grab, move, and throw cubes</span>
+        </div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">👍</div>
+        <div class="hand-gesture-info">
+          <b>Thumbs Up</b>
+          <span>Shift scene colors &amp; lighting</span>
+        </div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">🖐️</div>
+        <div class="hand-gesture-info">
+          <b>Open Hand</b>
+          <span>Release held object &amp; free track</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selector -->
+    <div class="hand-mode-picker">
+      <span>Tracking:</span>
+      <div class="hand-mode-toggles">
+        <button type="button" id="startMode2" class="hand-mode-opt active">2 Hands</button>
+        <button type="button" id="startMode1" class="hand-mode-opt">1 Hand</button>
+      </div>
+    </div>
+
+    <div class="hand-privacy-note">
+      🔒 Camera stream runs 100% locally on your device via WebGL. No video data leaves your browser.
+    </div>
+
+    <div class="hand-btn-group">
+      <button id="handStartBtn" type="button" class="hub-btn hub-btn-primary">
+        Start Simulation
+      </button>
+      <a href="../index.html" class="hub-btn hub-btn-secondary" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+        <span class="hand-btn-star">
+          <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+        </span>
+        <span>← Back to Hub Menu</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- In-Game Pause Menu Screen -->
+<div id="handPauseMenu" class="hand-overlay" style="display:none;">
+  <div class="hand-card">
+    <div id="hand-pause-icon" class="hand-star-icon">
+      <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+    </div>
+    <h2 class="hand-title">SIMULATION PAUSED</h2>
+    <p class="hand-sub">Holographic Hand Laboratory</p>
+
+    <div class="hand-gestures-grid hand-gestures-compact">
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">✌️</div>
+        <div class="hand-gesture-info"><b>Peace</b><span>Spawn cube</span></div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">🤏</div>
+        <div class="hand-gesture-info"><b>Pinch</b><span>Grab &amp; throw</span></div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">👍</div>
+        <div class="hand-gesture-info"><b>Thumbs Up</b><span>Color shift</span></div>
+      </div>
+      <div class="hand-gesture-card">
+        <div class="hand-gesture-icon">🖐️</div>
+        <div class="hand-gesture-info"><b>Open Hand</b><span>Release cube</span></div>
+      </div>
+    </div>
+
+    <div class="hand-pause-actions">
+      <button id="handPauseModeBtn" type="button" class="hand-action-btn">
+        <span>Tracking Mode:</span>
+        <b id="pauseModeText">2 Hands</b>
+      </button>
+      <button id="handResetCubesBtn" type="button" class="hand-action-btn">
+        <span>Reset &amp; Clear Cubes</span>
+        <span>↺</span>
+      </button>
+    </div>
+
+    <div class="hand-btn-group" style="margin-top:20px;">
+      <button id="handResumeBtn" type="button" class="hub-btn hub-btn-primary">
+        Resume Simulation
+      </button>
+      <a href="../index.html" class="hub-btn hub-btn-secondary" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+        <span class="hand-btn-star">
+          <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+        </span>
+        <span>← Back to Hub Menu</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div id="panel">
+  <div class="hand-panel-head">
+    <span class="hand-panel-star">
+      <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#handStarGrad)"></use></svg>
+    </span>
+    <span class="hand-panel-title">Hand Simulation</span>
+  </div>
+  <button id="mode" role="switch" aria-checked="true"><i></i><span id="modeLabel">Tracking Mode: 2 Hands</span></button>
+  <div id="legend">✌️ Peace sign: spawn a cube<br>👍 Thumbs up: shift colors<br>🤏 Pinch: grab and move</div>
+</div>
+<div id="gf"></div>
+<div id="hint">Show one or both hands to the camera</div>
+<div id="load" class="hide">
+  <div class="ring"></div>
+  <div id="loadTitle">Initializing AI Hand Tracking &amp; 3D Engine...</div>
+  <div id="sub">Loading hand-tracking model</div>
+  <a href="../index.html" id="loadBackBtn" class="hub-btn hub-btn-secondary" style="margin-top:12px; padding:8px 22px; font-size:12px; text-decoration:none;">← Back to Hub Menu</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script src="hub-nav.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const load = $('load'), sub = $('sub'), hint = $('hint'), video = $('pip');
+let ready = false;
+
+/* ---------- Renderer, scene, camera ---------- */
+const R = new THREE.WebGLRenderer({canvas: $('gl'), antialias: true, alpha: true}); // alpha: CSS gradient shows through
+R.setPixelRatio(Math.min(devicePixelRatio, 2));
+R.shadowMap.enabled = true;
+R.shadowMap.type = THREE.PCFSoftShadowMap;
+R.toneMapping = THREE.ACESFilmicToneMapping;
+R.toneMappingExposure = 1.15;
+R.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x070b14, 0.04);
+const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+cam.position.set(0, 1, 8.5);
+cam.lookAt(0, -0.2, 0);
+function resize() {
+  R.setSize(innerWidth, innerHeight);
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- Lights ---------- */
+scene.add(new THREE.AmbientLight(0x6f8fb8, 0.45));
+const hemi = new THREE.HemisphereLight(0x9fdcff, 0x0a1020, 0.7); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(2.5, 7, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+Object.assign(sun.shadow.camera, {left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 25});
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun);
+
+/* ---------- Floor: glossy plane + faint grid ---------- */
+const FLOOR_Y = -2.2;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({color: 0x12203a, roughness: 0.35, metalness: 0.35}));
+floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR_Y; floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(80, 80, 0x35e0ff, 0x16405a);
+grid.position.y = FLOOR_Y + 0.01;
+grid.material.transparent = true; grid.material.opacity = 0.22;
+scene.add(grid);
+
+/* ---------- Constants ---------- */
+const S = 7;                           // world units spanned by the full image height
+const PINCH_ON = 0.4, PINCH_OFF = 0.6; // thumb-index distance in "hand units" (hysteresis band around the 0.5 guideline)
+const CUBE_S = 0.7, GRAB_R = 0.95;     // cube edge; grab radius = bounding-sphere radius (0.61) + tolerance for noisy MediaPipe depth
+
+/* ---------- Hand factory: a pool of two pre-built hands ---------- */
+// MediaPipe landmark tree: 0 wrist; 1-4 thumb; 5-8 index; 9-12 middle; 13-16 ring; 17-20 pinky. 20 bones = one per non-wrist joint.
+const PARENT = [-1,0,1,2,3, 0,5,6,7, 0,9,10,11, 0,13,14,15, 0,17,18,19];
+const RAD = PARENT.map((p, i) => i === 0 ? 0.17 : [0.12, 0.105, 0.09, 0.075][(i - 1) % 4]);
+const PALM = [0, 1, 5, 9, 13, 17];
+const sphereGeo = new THREE.SphereGeometry(1, 20, 14);
+const boneGeo = new THREE.CylinderGeometry(0.88, 1, 1, 14); // unit height along Y
+const UP = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3();
+let asp = 4 / 3;
+
+class Hand {
+  constructor(color, emissive) {
+    this.mat = new THREE.MeshPhysicalMaterial({color, emissive, emissiveIntensity: 0.7, metalness: 0.15, roughness: 0.18,
+      clearcoat: 1, clearcoatRoughness: 0.15, transmission: 0.2, thickness: 0.5, transparent: true, opacity: 0.95});
+    this.palmMat = this.mat.clone(); this.palmMat.side = THREE.DoubleSide;
+    this.group = new THREE.Group(); this.group.visible = false; scene.add(this.group);
+    this.joints = []; this.bones = [];
+    for (let i = 0; i < 21; i++) {
+      const j = new THREE.Mesh(sphereGeo, this.mat); j.castShadow = true; this.group.add(j); this.joints.push(j);
+      if (i) { const b = new THREE.Mesh(boneGeo, this.mat); b.castShadow = true; this.group.add(b); this.bones.push(b); } // bones[i-1] ends at joint i
+    }
+    this.palmGeo = new THREE.BufferGeometry();
+    this.palmGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3));
+    this.palmGeo.setIndex([0,1,2, 0,2,3, 0,3,4, 0,4,5]);
+    const palm = new THREE.Mesh(this.palmGeo, this.palmMat);
+    palm.castShadow = true; palm.frustumCulled = false; this.group.add(palm);
+    this.tgt = Array.from({length: 21}, () => new THREE.Vector3()); // latest tracked pose (world space)
+    this.cur = Array.from({length: 21}, () => new THREE.Vector3()); // smoothed pose that is rendered
+    this.glow = new THREE.PointLight(color, 0, 8); scene.add(this.glow);
+    this.lastSeen = -1e9; this.presence = 0;
+    this.pinching = false; this.pinchStart = false; this.pinch = new THREE.Vector3(); this.unit = 1;
+  }
+
+  /* COORDINATE MAPPING. MediaPipe: x,y in [0,1] (origin top-left, y down), z = depth relative to the wrist in roughly x-units
+     (negative = nearer the webcam). Three.js: x right, y up, +z toward the viewer.
+       X = (0.5 - x) * asp * S   centre, flip for the mirror effect, scale by aspect so pixels stay square
+       Y = (0.5 - y) * S         centre, flip y-down to y-up
+       Z = -z * asp * S          nearer the webcam = nearer the viewer */
+  setTarget(lm) {
+    for (let i = 0; i < 21; i++) this.tgt[i].set((0.5 - lm[i].x) * asp * S, (0.5 - lm[i].y) * S, -lm[i].z * asp * S);
+    this.lastSeen = performance.now();
+  }
+
+  update(dt) {
+    const cur = this.cur, tgt = this.tgt, g = this.group;
+    const want = performance.now() - this.lastSeen < 300 ? 1 : 0; // tolerate single-frame dropouts
+    // Exponential low-pass on every joint (frame-rate independent); snap to the target when the hand first appears.
+    if (want && this.presence < 0.02) cur.forEach((c, i) => c.copy(tgt[i]));
+    else { const k = 1 - Math.exp(-dt * 22); cur.forEach((c, i) => c.lerp(tgt[i], k)); }
+    // Fade in fast, fade out slowly: this is what hides the unused second hand.
+    this.presence += (want - this.presence) * (1 - Math.exp(-dt * (want ? 10 : 3.5)));
+    g.visible = this.presence > 0.01;
+    this.mat.opacity = 0.95 * this.presence; this.palmMat.opacity = 0.45 * this.presence;
+    this.glow.intensity = 1.2 * this.presence;
+    this.pinchStart = false;
+    if (!g.visible) { this.pinching = false; return; }
+
+    const u = this.unit = THREE.MathUtils.clamp(cur[0].distanceTo(cur[9]) / 0.8, 0.5, 3.5); // hand size on screen
+    for (let i = 0; i < 21; i++) { this.joints[i].position.copy(cur[i]); this.joints[i].scale.setScalar(RAD[i] * u); }
+
+    /* BONE MATH. A unit-height cylinder is centred on the origin and runs along +Y. To bridge parent joint A and child joint B:
+         position = (A + B) / 2          the midpoint
+         d = B - A, L = |d|              scale.y = L stretches the unit cylinder to span the gap exactly
+         d^ = d / L; rotation = shortest-arc quaternion from (0,1,0) to d^:
+           axis = Y x d^ (normalised), angle = acos(Y . d^), q = (axis * sin(angle/2), cos(angle/2))
+         Quaternion.setFromUnitVectors does exactly this (including the anti-parallel case) with no gimbal lock. */
+    for (let i = 1; i < 21; i++) {
+      const A = cur[PARENT[i]], B = cur[i], bone = this.bones[i - 1];
+      dir.subVectors(B, A);
+      const L = dir.length() || 1e-4;
+      bone.position.addVectors(A, B).multiplyScalar(0.5);
+      bone.quaternion.setFromUnitVectors(UP, dir.divideScalar(L));
+      const r = RAD[i] * u * 0.85;
+      bone.scale.set(r, L, r);
+    }
+    const pp = this.palmGeo.attributes.position;
+    PALM.forEach((j, k) => pp.setXYZ(k, cur[j].x, cur[j].y, cur[j].z));
+    pp.needsUpdate = true; this.palmGeo.computeVertexNormals();
+    this.glow.position.set(cur[9].x, cur[9].y + 0.4, cur[9].z + 1.6);
+
+    /* PINCH DETECTION. Thumb tip = landmark 4, index tip = landmark 8 (smoothed world positions).
+         d      = |P4 - P8|          3D Euclidean distance between the fingertips
+         anchor = (P4 + P8) / 2      pinch centre = the grab point
+       Thresholds are multiplied by "unit" (hand size on screen) so they stay valid at any distance from the webcam;
+       a fixed world-unit value would be too loose far away and too strict up close.
+       Hysteresis: a free hand starts pinching below PINCH_ON * unit and only stops above PINCH_OFF * unit, so jitter near
+       the threshold cannot make the grip flicker. pinchStart is true only on the single frame of the free -> pinching transition. */
+    const d = cur[4].distanceTo(cur[8]), was = this.pinching;
+    this.pinching = want === 1 && d < (was ? PINCH_OFF : PINCH_ON) * u;
+    this.pinchStart = this.pinching && !was;
+    this.pinch.addVectors(cur[4], cur[8]).multiplyScalar(0.5);
+    this.mat.emissiveIntensity += ((this.pinching ? 1.8 : 0.7) - this.mat.emissiveIntensity) * (1 - Math.exp(-dt * 14)); // tips glow while pinching
+  }
+}
+const pool = [new Hand(0x8fe9ff, 0x0b5f80), new Hand(0xffb86b, 0x7a3a08)]; // hand 0 cyan, hand 1 amber
+
+/* ---------- Cubes ---------- */
+const REST_Y = FLOOR_Y + CUBE_S / 2, MAX_CUBES = 12;
+const cubeGeo = new THREE.BoxGeometry(CUBE_S, CUBE_S, CUBE_S);
+const edgeGeo = new THREE.EdgesGeometry(cubeGeo);
+const edgeMat = new THREE.LineBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.6});
+const WHITE = new THREE.Color(0xffffff), GREEN = new THREE.Color(0x35ff8a), HEMI = new THREE.Color(0x9fdcff);
+const cubes = []; // {mesh, base (resting colour), col (displayed state colour), holder (hand index or -1), vy, floating, flash}
+
+function spawnCube(pos, hue, floating, flash) {
+  if (cubes.length >= MAX_CUBES) { // keep the scene light: recycle the oldest cube nobody is holding
+    const i = cubes.findIndex(c => c.holder < 0);
+    if (i >= 0) { const [old] = cubes.splice(i, 1); scene.remove(old.mesh); old.mesh.material.dispose(); }
+  }
+  const base = new THREE.Color().setHSL(hue, 1, 0.55);
+  const mesh = new THREE.Mesh(cubeGeo, new THREE.MeshStandardMaterial({color: base, emissive: base, emissiveIntensity: 1.1, roughness: 0.35, metalness: 0.1}));
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.add(new THREE.LineSegments(edgeGeo, edgeMat));
+  mesh.position.copy(pos); scene.add(mesh);
+  cubes.push({mesh, base, col: base.clone(), holder: -1, vy: 0, floating, flash});
+}
+spawnCube(new THREE.Vector3(0, REST_Y, 0), 0.86, false, 0);
+
+/* ---------- Gesture recognition ---------- */
+const gf = $('gf');
+const EXT = 1.5, FOLD = 1.3, THUMB_EXT = 1.8;           // tip-to-wrist / knuckle-to-wrist distance ratios
+const HOLD_MS = 120, COOLDOWN_MS = 1000;                // pose must be held 120 ms; then that gesture is locked out for 1 s
+const FINGERS = [[8, 5], [12, 9], [16, 13], [20, 17]];  // [tip, knuckle] for index, middle, ring, pinky
+const cool = {peace: 0, thumbs: 0};                     // time (ms) at which each gesture may fire again
+function toast(msg) { gf.textContent = msg; gf.classList.remove('on'); void gf.offsetWidth; gf.classList.add('on'); } // reflow restarts the CSS animation
+
+function recognize(h) {
+  /* FINGER-STATE MATH. Only distances are used, never directions, so it works at any hand rotation:
+       ratio = |tip - wrist| / |knuckle - wrist|
+     An extended finger puts its tip far beyond the knuckle (ratio about 2); a curled finger pulls the tip back toward the palm
+     (ratio about 1). Dividing by the knuckle distance cancels hand size and camera distance.
+       Extended: ratio > EXT     Folded: ratio < FOLD     in between = undecided, so a half-curled finger never triggers anything.
+     The thumb is short and folds across the palm, so it is measured against its MCP joint (landmark 2) with a higher threshold. */
+  const c = h.cur, w = c[0];
+  const ratio = (t, k) => c[t].distanceTo(w) / (c[k].distanceTo(w) || 1e-4);
+  const r = FINGERS.map(([t, k]) => ratio(t, k));
+  const ext = r.map(x => x > EXT), fold = r.map(x => x < FOLD);
+  if (ext[0] && ext[1] && fold[2] && fold[3]) return 'peace';                  // index + middle up, ring + pinky down
+  if (ratio(4, 2) > THUMB_EXT && fold.every(Boolean)) return 'thumbs';         // thumb out, all four fingers strictly folded
+  return null;
+}
+function gestures(now) {
+  pool.forEach((h, i) => {
+    const live = h.presence > 0.6 && now - h.lastSeen < 300;
+    const busy = h.pinching || cubes.some(c => c.holder === i);               // ignore gestures while grabbing
+    const g = live && !busy ? recognize(h) : null;
+    /* DEBOUNCE, two layers:
+       1. Hold time: h.gesture / h.since track the current pose. Any change (even to null) restarts the clock, so the transitional
+          poses while forming a fist or peace sign are ignored; the pose must persist for HOLD_MS.
+       2. Cooldown: after firing, cool[g] = now + COOLDOWN_MS blocks that gesture, so holding the pose fires once per second at most
+          instead of every frame. The lock is shared by both hands, so two hands cannot double-fire. */
+    if (g !== h.gesture) { h.gesture = g; h.since = now; }
+    else if (g && now - h.since > HOLD_MS && now > cool[g]) { cool[g] = now + COOLDOWN_MS; fire(g, h); }
+  });
+}
+function fire(g, h) {
+  if (g === 'peace') {
+    spawnCube(h.cur[9], Math.random(), true, 1); // at the palm (landmark 9), floating, starts white and fades to its colour
+    toast('✌️ Cube Spawned!');
+  } else {
+    const hue = Math.random();
+    cubes.forEach((c, i) => { c.base.setHSL((hue + i * 0.07) % 1, 1, 0.55); c.col.copy(c.base); }); // instant colour + emissive change
+    hemi.color.setHSL(hue, 1, 0.6); hemi.intensity = 2.2;                                          // sky light flashes in the same hue
+    toast('👍 Color Shift!');
+  }
+}
+
+/* ---------- Grab / release / physics ---------- */
+function interact(dt) {
+  /* GRAB STATE MACHINE, per cube: c.holder = index of the hand holding it (-1 = free).
+       Release: the holder stopped pinching (or lost tracking) -> c.holder = -1 and gravity resumes.
+       Grab: on the frame a hand's pinch starts, scan only the FREE cubes and take the one nearest to the pinch centre if it is
+             within GRAB_R. Scanning free cubes only means a held cube can never be taken by the other hand, and a hand only
+             grabs on pinchStart (never while already pinching), so it holds at most one cube. */
+  cubes.forEach(c => { if (c.holder >= 0 && !pool[c.holder].pinching) c.holder = -1; });
+  pool.forEach((h, i) => {
+    if (!h.pinchStart) return;
+    let best = null, bd = GRAB_R;
+    cubes.forEach(c => { const d = c.holder < 0 ? h.pinch.distanceTo(c.mesh.position) : Infinity; if (d < bd) { bd = d; best = c; } });
+    if (best) { best.holder = i; best.vy = 0; best.floating = false; }
+  });
+  gestures(performance.now());
+
+  const kc = 1 - Math.exp(-dt * 12), kf = 1 - Math.exp(-dt * 35);
+  cubes.forEach(c => {
+    const m = c.mesh, mat = m.material, held = c.holder >= 0;
+    if (held) m.position.lerp(pool[c.holder].pinch, kf); // fast lerp: no pop at the grab, then tracks the pinch centre closely
+    else if (!c.floating) { // spawned cubes hover until their first grab; after that gravity applies
+      c.vy -= 20 * dt; m.position.y += c.vy * dt;
+      if (m.position.y < REST_Y) { m.position.y = REST_Y; c.vy = Math.abs(c.vy) > 2 ? -c.vy * 0.3 : 0; }
+      m.position.z -= m.position.z * Math.min(1, dt * 2); // ease back to the hands' depth plane so it stays reachable
+    }
+    m.rotation.y += dt * (held ? 2 : 0.4);
+    c.col.lerp(held ? GREEN : c.base, kc);               // green while held
+    c.flash = Math.max(0, c.flash - dt * 2.5);           // spawn flash decays from 1 (white) to 0
+    mat.color.copy(c.col).lerp(WHITE, c.flash); mat.emissive.copy(mat.color);
+    mat.emissiveIntensity += ((held ? 2.4 : 1.1) + c.flash * 2 - mat.emissiveIntensity) * kc;
+  });
+  const kh = 1 - Math.exp(-dt * 1.5); // ease the sky light back after a colour shift
+  hemi.color.lerp(HEMI, kh); hemi.intensity += (0.7 - hemi.intensity) * kh;
+
+  const msg = cubes.some(c => c.holder >= 0) ? 'Open your fingers to release the cube'
+    : pool.some(h => h.presence > 0.3) ? 'Pinch thumb and index finger on a cube to grab it' : 'Show your hand to the camera';
+  if (hint.textContent !== msg) hint.textContent = msg;
+  hint.style.opacity = ready ? 1 : 0;
+}
+
+/* ---------- State & Menus ---------- */
+let isStarted = false;
+let isPaused = false;
+let mp = null, mode = '2';
+
+// Star icons are pre-rendered in HTML with the shared SVG star symbol
+// Fallback check in case the container needs initialization
+if (window.HubNav) {
+  const startIcon = $('hand-start-icon');
+  const pauseIcon = $('hand-pause-icon');
+  const stops = (HubNav.GAME_CONFIGS['hand-simulation'] && HubNav.GAME_CONFIGS['hand-simulation'].stops) || [
+    { offset: '0%', color: '#5ae0ff' },
+    { offset: '50%', color: '#0099ff' },
+    { offset: '100%', color: '#0a1e3f' }
+  ];
+  if (startIcon && !startIcon.firstElementChild) {
+    startIcon.innerHTML = HubNav.createStarSvg('handStartStarGrad', stops, 'hub-hero-star');
+  }
+  if (pauseIcon && !pauseIcon.firstElementChild) {
+    pauseIcon.innerHTML = HubNav.createStarSvg('handPauseStarGrad', stops, 'hub-hero-star');
+  }
+}
+
+const modeBtn = $('mode'), modeLabel = $('modeLabel');
+const pauseModeText = $('pauseModeText');
+const startMode1 = $('startMode1'), startMode2 = $('startMode2');
+
+function setTrackingMode(newMode) {
+  mode = newMode;
+  modeBtn.setAttribute('aria-checked', mode === '2');
+  modeLabel.textContent = 'Tracking Mode: ' + (mode === '1' ? '1 Hand' : '2 Hands');
+  if (pauseModeText) pauseModeText.textContent = (mode === '1' ? '1 Hand' : '2 Hands');
+  if (startMode1) startMode1.classList.toggle('active', mode === '1');
+  if (startMode2) startMode2.classList.toggle('active', mode === '2');
+  if (mp) mp.setOptions({maxNumHands: mode === '1' ? 1 : 2});
+  if (mode === '1') pool[1].lastSeen = -1e9; // second hand fades out
+}
+
+modeBtn.onclick = () => setTrackingMode(mode === '1' ? '2' : '1');
+if (startMode1) startMode1.onclick = () => setTrackingMode('1');
+if (startMode2) startMode2.onclick = () => setTrackingMode('2');
+
+const startMenu = $('handStartMenu');
+const pauseMenu = $('handPauseMenu');
+const startBtn = $('handStartBtn');
+const resumeBtn = $('handResumeBtn');
+const menuBtn = $('handMenuBtn');
+const pauseModeBtn = $('handPauseModeBtn');
+const resetCubesBtn = $('handResetCubesBtn');
+
+function startSimulation() {
+  if (isStarted) return;
+  isStarted = true;
+  if (startMenu) startMenu.style.display = 'none';
+  if (!ready) {
+    load.classList.remove('hide');
+  }
+  toast('👋 Wave to the camera!');
+}
+
+function pauseSimulation() {
+  if (!isStarted) return;
+  isPaused = true;
+  if (pauseMenu) pauseMenu.style.display = 'flex';
+}
+
+function resumeSimulation() {
+  isPaused = false;
+  if (pauseMenu) pauseMenu.style.display = 'none';
+}
+
+function togglePause() {
+  if (!isStarted) return;
+  if (isPaused) resumeSimulation();
+  else pauseSimulation();
+}
+
+if (startBtn) startBtn.onclick = startSimulation;
+if (resumeBtn) resumeBtn.onclick = resumeSimulation;
+if (menuBtn) menuBtn.onclick = togglePause;
+if (pauseModeBtn) pauseModeBtn.onclick = () => setTrackingMode(mode === '1' ? '2' : '1');
+
+if (resetCubesBtn) {
+  resetCubesBtn.onclick = () => {
+    while (cubes.length > 0) {
+      const c = cubes.pop();
+      scene.remove(c.mesh);
+      if (c.mesh.geometry) c.mesh.geometry.dispose();
+      if (c.mesh.material) c.mesh.material.dispose();
+    }
+    spawnCube(new THREE.Vector3(0, REST_Y, 0), 0.86, false, 0);
+    toast('↺ Cubes Reset!');
+  };
+}
+
+// Global Keyboard shortcuts: Esc or P
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' || e.key === 'KeyP' || e.code === 'KeyP') {
+    e.preventDefault();
+    if (!isStarted) {
+      startSimulation();
+    } else {
+      togglePause();
+    }
+  }
+});
+
+/* ---------- Render loop ---------- */
+const clock = new THREE.Clock();
+(function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (isStarted && !isPaused) {
+    pool.forEach(h => h.update(dt));
+    interact(dt);
+  }
+  R.render(scene, cam);
+})();
+
+/* ---------- MediaPipe Hands + webcam ---------- */
+function onResults(res) {
+  if (!ready) { ready = true; load.classList.add('hide'); } // first processed frame -> fade out the overlay
+  asp = video.videoWidth / video.videoHeight || 4 / 3;
+  // multiHandLandmarks[0] -> first hand group, [1] -> second (ignored in 1-hand mode, e.g. for frames still in flight after a switch)
+  (res.multiHandLandmarks || []).forEach((lm, i) => { if (pool[i] && i < +mode) pool[i].setTarget(lm); });
+}
+
+function fail(e) {
+  console.error(e);
+  const ring = document.querySelector('.ring');
+  if (ring) ring.style.display = 'none';
+  const lt = $('loadTitle');
+  if (lt) lt.textContent = 'Camera / Model Initialization Error';
+  sub.innerHTML = `Could not start: ${((e && e.message) || e)}.<br><br>Make sure camera access is allowed in your browser permissions and this page is served via localhost or https.<br><br><button onclick="location.reload()" class="hub-btn hub-btn-primary" style="padding:8px 22px; font-size:12px; margin-top:8px;">Retry Camera</button>`;
+  load.classList.remove('hide');
+}
+
+(async function start() {
+  try {
+    if (typeof Hands === 'undefined' || typeof Camera === 'undefined') throw new Error('MediaPipe scripts failed to load (check your connection)');
+    mp = new Hands({locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/' + f});
+    mp.setOptions({maxNumHands: mode === '1' ? 1 : 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7});
+    mp.onResults(onResults);
+    await mp.initialize();
+    sub.textContent = 'Starting camera stream...';
+    const mpCam = new Camera(video, {onFrame: async () => { await mp.send({image: video}); }, width: 640, height: 480});
+    await mpCam.start();
+  } catch (e) { fail(e); }
+})();
+</script>
+</body>
+</html>
