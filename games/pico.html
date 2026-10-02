@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stack Park - 4 Player Co-op</title>
+<style>
+  /* Reset margins, dark background, center the canvas */
+  html, body { margin:0; height:100%; background:#0a0a14; overflow:hidden; }
+  body { display:flex; align-items:center; justify-content:center; }
+  canvas { width:min(100vw, calc(100vh * 16 / 9)); aspect-ratio:16/9; background:#000; }
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<script>
+/* =====================================================================
+   STACK PARK - 4 players, 1 keyboard. All 4 must touch the door together.
+   Physics runs at a fixed 60 Hz step so behaviour is identical on any screen.
+   ===================================================================== */
+const W = 960, H = 540;          // logical screen size (every level fits on one screen)
+const S = 30;                    // player size (square)
+const GRAV = 0.55, JUMP = -11, SPEED = 3.5, MAXFALL = 13, EPS = 0.001;
+const ctx = document.getElementById('c').getContext('2d');
+
+/* ---------- CONTROLS (uses physical key codes, so 4 keys can be held at once) ---------- */
+const CONTROLS = [
+  { up:'KeyW',    left:'KeyA',      right:'KeyD'       }, // P1 red
+  { up:'ArrowUp', left:'ArrowLeft', right:'ArrowRight' }, // P2 blue
+  { up:'KeyI',    left:'KeyJ',      right:'KeyL'       }, // P3 green
+  { up:'KeyT',    left:'KeyF',      right:'KeyH'       }  // P4 yellow
+];
+const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fdd835'];
+
+/* ---------- LEVELS ----------
+   To add a level: copy one object below and append it to LEVELS.
+   Rectangles are [x, y, width, height] in pixels (screen is 960x540).
+   spawn    : [x, y] of player 1; the others are placed 40px apart to the right
+   platforms: solid rectangles (floors, walls, ledges)
+   goal     : the door rectangle - all 4 players must overlap it at once
+   button   : (optional) rectangle; touching it once permanently opens the gate
+   gate     : (optional) solid rectangle that disappears once the button is pressed */
+const LEVELS = [
+  { // Level 1 - Introduction: walk right, enter the door together
+    name: 'Level 1 - First Steps',
+    hint: 'Walk to the door together. Players are solid: you can push each other!',
+    spawn: [50, 450],
+    platforms: [[0, 480, 960, 60]],
+    goal: [860, 400, 60, 80]
+  },
+  { // Level 2 - The Stack: a floating ledge is too high for 1 or 2 players
+    name: 'Level 2 - The Stack',
+    hint: 'Stack 3 high to reach the ledge. The button opens the gate!',
+    spawn: [50, 450],
+    platforms: [
+      [0, 480, 960, 60],      // floor
+      [400, 340, 140, 20]     // high ledge (top at y=340, 120px of headroom below)
+    ],
+    button: [470, 330, 40, 10],  // sits on top of the ledge
+    gate:   [780, 120, 20, 360], // tall wall in front of the door
+    goal: [850, 400, 70, 80]
+  },
+  { // Level 3 - The Gap: too wide to jump; use teammates as stepping stones
+    name: 'Level 3 - The Bridge',
+    hint: 'Drop into the pit and stand still - friends can hop across your heads!',
+    spawn: [50, 370],
+    platforms: [
+      [0, 400, 300, 140],     // left cliff
+      [300, 480, 300, 60],    // pit floor (safe, 80px deep - you can climb out alone)
+      [600, 400, 360, 140]    // right cliff
+    ],
+    goal: [860, 320, 60, 80]
+  }
+];
+
+/* ---------- STATE ---------- */
+const keys = {};
+let levelIdx = 0, level, solids, active, gate, button, gateOpen, players, state, timer;
+const rect = ([x, y, w, h]) => ({ x, y, w, h });
+// AABB overlap (tiny epsilon so merely touching edges never counts as overlap)
+const hit = (a, b) => a.x < b.x + b.w - EPS && a.x + a.w > b.x + EPS &&
+                      a.y < b.y + b.h - EPS && a.y + a.h > b.y + EPS;
+
+function loadLevel(i) {
+  levelIdx = i; level = LEVELS[i]; gateOpen = false; state = 'play'; timer = 0;
+  solids = level.platforms.map(rect);
+  solids.push({ x:-50, y:-600, w:50, h:1400 }, { x:W, y:-600, w:50, h:1400 }); // invisible side walls
+  gate = level.gate ? rect(level.gate) : null;
+  button = level.button ? rect(level.button) : null;
+  players = COLORS.map((color, k) => ({
+    x: level.spawn[0] + k * 40, y: level.spawn[1], w: S, h: S, vx: 0, vy: 0,
+    ground: null,   // what this player is standing on (static rect or another player)
+    coyote: 0, jumpBuf: 0, face: 1, color, ctl: CONTROLS[k]
+  }));
+}
+
+/* ---------- COLLISION-AWARE MOVEMENT ----------
+   Axes are moved one at a time. Other players are solid:
+   - Walking into someone pushes them (chain pushes work, walls stop the chain).
+   - Standing on someone carries you when they walk.
+   - Jumping up into someone above you lifts them (so stacks stay together). */
+function moveX(p, dx, d = 0) {
+  if (!dx || d > 8) return 0;
+  const x0 = p.x;
+  p.x += dx;
+  for (const s of active) if (hit(p, s)) p.x = dx > 0 ? s.x - p.w : s.x + s.w;
+  for (const q of players) if (q !== p && hit(p, q)) {
+    const pen = dx > 0 ? p.x + p.w - q.x : q.x + q.w - p.x;   // how far we overlap
+    moveX(q, dx > 0 ? pen : -pen, d + 1);                      // try to push them out of the way
+    if (hit(p, q)) p.x = dx > 0 ? q.x - p.w : q.x + q.w;       // they couldn't move: we stop
+  }
+  const moved = p.x - x0;
+  if (moved) for (const q of players) if (q !== p && q.ground === p) moveX(q, moved, d + 1); // carry riders
+  return moved;
+}
+
+function moveY(p, dy, d = 0) {
+  p.y += dy; p.ground = null;
+  for (const s of active) if (hit(p, s)) {
+    if (dy > 0) { p.y = s.y - p.h; p.ground = s; } else p.y = s.y + s.h;
+    p.vy = 0;
+  }
+  for (const q of players) if (q !== p && hit(p, q)) {
+    if (dy > 0) { p.y = q.y - p.h; p.ground = q; p.vy = 0; }   // land on someone's head
+    else {                                                     // rising into someone above: lift them
+      if (d < 6) moveY(q, -(q.y + q.h - p.y), d + 1);
+      if (hit(p, q)) { p.y = q.y + q.h; p.vy = 0; }            // blocked (ceiling): bonk
+    }
+  }
+}
+
+function respawn(p) {  // fell out of the world: drop back in at the start
+  p.x = level.spawn[0]; p.y = level.spawn[1] - 40; p.vx = p.vy = 0;
+  for (let n = 0; n < 60 && players.some(q => q !== p && hit(p, q)); n++) p.y -= 10;
+}
+
+function stepPlayer(p) {
+  const dir = (keys[p.ctl.right] ? 1 : 0) - (keys[p.ctl.left] ? 1 : 0);
+  if (dir) p.face = dir;
+  p.coyote = p.ground ? 6 : p.coyote - 1;                    // brief grace time after leaving a ledge
+  p.vx += (dir * SPEED - p.vx) * (p.ground ? 0.3 : 0.18);    // smooth accel / friction
+  if (!dir && Math.abs(p.vx) < 0.05) p.vx = 0;
+  if (p.jumpBuf > 0) {                                       // buffered jump press (8 frames)
+    p.jumpBuf--;
+    if (p.coyote > 0) { p.vy = JUMP; p.coyote = 0; p.jumpBuf = 0; p.ground = null; }
+  }
+  p.vy = Math.min(p.vy + GRAV, MAXFALL);
+  const moved = moveX(p, p.vx);
+  if (Math.abs(moved - p.vx) > 0.01) p.vx = 0;               // hit something: lose speed
+  moveY(p, p.vy);
+  if (p.y > H + 100) respawn(p);
+}
+
+function update() {
+  if (state === 'win') return;
+  // Button: pressing it once opens the gate for good
+  if (button && !gateOpen && players.some(p => hit(p, button))) gateOpen = true;
+  active = (gate && !gateOpen) ? solids.concat(gate) : solids;
+  players.forEach(stepPlayer);
+  if (state === 'play') {
+    const goal = rect(level.goal);
+    if (players.every(p => hit(p, goal))) { state = 'clear'; timer = 100; }  // ALL 4 inside the door
+  } else if (--timer <= 0) {
+    if (levelIdx + 1 < LEVELS.length) loadLevel(levelIdx + 1); else state = 'win';
+  }
+}
+
+/* ---------- RENDERING ---------- */
+function text(t, x, y, size, color, align = 'center') {
+  ctx.font = `bold ${size}px Arial, sans-serif`; ctx.textAlign = align; ctx.fillStyle = color;
+  ctx.fillText(t, x, y);
+}
+
+function draw() {
+  ctx.fillStyle = '#14142b'; ctx.fillRect(0, 0, W, H);
+
+  // Goal door (pulsing purple glow)
+  const g = rect(level.goal), pulse = 20 + Math.sin(performance.now() / 200) * 8;
+  ctx.shadowColor = '#c060ff'; ctx.shadowBlur = pulse;
+  ctx.fillStyle = '#9b30ff'; ctx.fillRect(g.x, g.y, g.w, g.h);
+  ctx.shadowBlur = 0;
+
+  // Platforms
+  for (const s of level.platforms.map(rect)) {
+    ctx.fillStyle = '#2b2b2b'; ctx.fillRect(s.x, s.y, s.w, s.h);
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.strokeRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2);
+  }
+  // Button + gate
+  if (button) { ctx.fillStyle = gateOpen ? '#4caf50' : '#f44336'; ctx.fillRect(button.x, button.y, button.w, button.h); }
+  if (gate && !gateOpen) {
+    ctx.fillStyle = '#b5651d'; ctx.fillRect(gate.x, gate.y, gate.w, gate.h);
+    ctx.fillStyle = '#e0913a'; for (let y = gate.y; y < gate.y + gate.h; y += 30) ctx.fillRect(gate.x, y, gate.w, 6);
+  }
+
+  // Players (square body + eyes that look where they walk)
+  for (const p of players) {
+    ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2);
+    ctx.fillStyle = '#fff'; ctx.fillRect(p.x + 7 + p.face * 3, p.y + 8, 6, 8); ctx.fillRect(p.x + 17 + p.face * 3, p.y + 8, 6, 8);
+    ctx.fillStyle = '#000'; ctx.fillRect(p.x + 9 + p.face * 5, p.y + 11, 3, 4); ctx.fillRect(p.x + 19 + p.face * 5, p.y + 11, 3, 4);
+  }
+
+  // HUD
+  const goal = rect(level.goal), inside = players.filter(p => hit(p, goal)).length;
+  text(level.name, 16, 28, 20, '#fff', 'left');
+  text('Door: ' + inside + '/4', W - 16, 28, 20, inside === 4 ? '#7CFC00' : '#c9a0ff', 'right');
+  text(level.hint, W / 2, 56, 15, '#9aa', 'center');
+  text('P1: W A D   |   P2: ↑ ← →   |   P3: I J L   |   P4: T F H   |   R: restart level', W / 2, H - 12, 13, '#667');
+
+  if (state !== 'play') {
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, W, H);
+    if (state === 'clear') text('LEVEL COMPLETE!', W / 2, H / 2, 48, '#7CFC00');
+    else { text('YOU ALL WIN!', W / 2, H / 2 - 10, 54, '#ffd54f'); text('Press Enter to play again', W / 2, H / 2 + 36, 20, '#fff'); }
+  }
+}
+
+/* ---------- INPUT & MAIN LOOP ---------- */
+addEventListener('keydown', e => {
+  if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  if (!e.repeat) {
+    players.forEach(p => { if (e.code === p.ctl.up) p.jumpBuf = 8; });
+    if (e.code === 'KeyR') loadLevel(levelIdx);
+    if (e.code === 'Enter' && state === 'win') loadLevel(0);
+  }
+  keys[e.code] = true;   // every held key is tracked independently -> 4 players at once
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+loadLevel(0);
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min((now - last) / 1000, 0.1); last = now;   // fixed 60Hz physics step
+  while (acc >= 1 / 60) { update(); acc -= 1 / 60; }
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

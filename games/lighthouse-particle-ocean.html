@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lighthouse · Particle Ocean</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #hint { position: fixed; left: 0; right: 0; bottom: 18px; text-align: center; pointer-events: none;
+          font: 13px/1.4 Georgia, serif; letter-spacing: .04em; color: rgba(255,190,90,.45); }
+</style>
+</head>
+<body>
+<div id="hint">Drag to orbit, scroll to zoom</div>
+
+<!-- Three.js r128 (UMD builds) + post-processing helpers -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/MaskPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+
+<script>
+/* ---------------------------------------------------------------
+   1. RENDERER, SCENE, CAMERA, CONTROLS
+---------------------------------------------------------------- */
+const PR = Math.min(window.devicePixelRatio || 1, 1.5);
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(PR);
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 1);               // pitch black
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const FOV = 48;
+const camera = new THREE.PerspectiveCamera(FOV, innerWidth / innerHeight, 0.5, 300);
+camera.position.set(0, 3.2, 27);                   // low, cinematic angle
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 4.5, 0);                    // lighthouse stays the focal point
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 16;
+controls.maxDistance = 38;
+controls.minPolarAngle = Math.PI * 0.32;
+controls.maxPolarAngle = Math.PI / 2 + 0.06;       // keep camera near the waterline, never under it
+controls.rotateSpeed = 0.5;
+
+/* ---------------------------------------------------------------
+   2. PARTICLE OCEAN (Gerstner waves in the vertex shader)
+---------------------------------------------------------------- */
+const N = 400, EXTENT = 150, COUNT = N * N;
+const positions = new Float32Array(COUNT * 3);
+const rand = new Float32Array(COUNT);
+for (let i = 0, k = 0; i < N; i++) {
+  for (let j = 0; j < N; j++, k++) {
+    // jittered grid avoids visible regular patterns
+    positions[k * 3]     = (i / (N - 1) - 0.5) * EXTENT + (Math.random() - 0.5) * EXTENT / N;
+    positions[k * 3 + 1] = 0;
+    positions[k * 3 + 2] = (j / (N - 1) - 0.5) * EXTENT + (Math.random() - 0.5) * EXTENT / N;
+    rand[k] = Math.random();
+  }
+}
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geo.setAttribute('aRand', new THREE.BufferAttribute(rand, 1));
+
+const waveUniforms = {
+  uTime:  { value: 0 },
+  uScale: { value: 1 },                       // px-per-world-unit factor for point size
+  uFocus: { value: 27 },                      // focus distance (for per-particle bokeh)
+  uBeam:  { value: new THREE.Vector2(1, 0) }  // current lighthouse beam direction (xz)
+};
+
+const waveMat = new THREE.ShaderMaterial({
+  uniforms: waveUniforms,
+  transparent: true,
+  depthWrite: true,                           // depth is needed by the DoF pass
+  blending: THREE.AdditiveBlending,
+  vertexShader: /* glsl */`
+    uniform float uTime, uScale, uFocus;
+    uniform vec2 uBeam;
+    attribute float aRand;
+    varying vec3 vCol;
+    varying float vAlpha, vBlur;
+
+    // One Gerstner wave: returns displacement (x, height, z)
+    vec3 G(vec2 p, vec2 d, float L, float a, float t){
+      d = normalize(d);
+      float k = 6.2832 / L;
+      float f = k * dot(d, p) - sqrt(9.8 * k) * t * 0.55;
+      return vec3(d.x * cos(f) * a * 0.9, sin(f) * a, d.y * cos(f) * a * 0.9);
+    }
+
+    void main(){
+      vec2 p = position.xz;
+      float t = uTime;
+
+      // Overlapping swells travelling in slightly different directions
+      vec3 w = G(p, vec2(1.0, 0.25), 30.0, 1.7, t)
+             + G(p, vec2(0.8,-0.6),  18.0, 0.8, t)
+             + G(p, vec2(1.0, 0.9),   9.0, 0.4, t)
+             + G(p, vec2(0.3, 1.0),   5.0, 0.17, t)
+             + G(p, vec2(-0.4,1.0),   2.6, 0.07, t);
+
+      // Waves are damped around the island and break into radial ripples
+      float r0 = length(p);
+      w *= smoothstep(2.5, 15.0, r0);
+      float ripple = 0.35 * sin(r0 * 1.3 - t * 2.2) * smoothstep(1.8, 3.5, r0) * exp(-r0 * 0.09);
+
+      vec3 P = vec3(p.x + w.x, w.y + ripple, p.y + w.z);
+
+      // Fiery colour map: deep orange in troughs -> bright yellow on crests
+      float h = P.y;
+      float heat = smoothstep(-1.4, 2.8, h);
+      vec3 orange = vec3(1.0, 0.30, 0.02);
+      vec3 yellow = vec3(1.0, 0.88, 0.25);
+      vec3 col = mix(orange, yellow, heat);
+      col += vec3(0.35, 0.28, 0.10) * smoothstep(2.0, 3.2, h);              // hot white-gold foam on crests
+      col += vec3(0.5, 0.2, 0.0) * (1.0 - smoothstep(3.0, 9.0, r0)) * 0.6;  // glow where waves hit the island
+
+      // Rotating beam sweeps light across the particles
+      float rr = length(P.xz);
+      float beam = pow(abs(dot(P.xz / max(rr, 0.001), uBeam)), 28.0) * smoothstep(1.5, 5.0, rr) * exp(-rr * 0.035);
+      col += vec3(1.0, 0.85, 0.4) * beam * 1.6;
+
+      vec4 mv = modelViewMatrix * vec4(P, 1.0);
+      float dist = -mv.z;
+
+      // Per-particle circle of confusion -> larger, softer, dimmer discs when out of focus
+      float coc = abs(dist - uFocus) / dist;
+      float blur = min(coc * 2.2, 3.0);
+
+      float tw = 0.75 + 0.25 * sin(uTime * 2.0 + aRand * 40.0);              // twinkle
+      float edge = 1.0 - smoothstep(48.0, 72.0, rr);                          // fade at field edge
+      float size = 0.085 * (0.7 + 0.6 * aRand) * (1.0 + beam * 1.2);
+
+      gl_PointSize = clamp(size * uScale / dist * (1.0 + blur), 1.0, 48.0);
+      gl_Position = projectionMatrix * mv;
+
+      vCol = col;
+      vBlur = blur;
+      vAlpha = 0.5 * (0.4 + 0.9 * heat) * tw * edge / (1.0 + blur * blur * 1.5);
+    }`,
+  fragmentShader: /* glsl */`
+    varying vec3 vCol;
+    varying float vAlpha, vBlur;
+    void main(){
+      float d = length(gl_PointCoord - 0.5) * 2.0;
+      if (d > 1.0) discard;
+      float core = exp(-d * d * 4.0);                       // sharp glowing dot
+      float disc = smoothstep(1.0, 0.75, d) * 0.6;          // flat bokeh disc
+      float s = mix(core, disc, clamp(vBlur, 0.0, 1.0));
+      gl_FragColor = vec4(vCol, s * vAlpha);
+    }`
+});
+scene.add(new THREE.Points(geo, waveMat));
+
+/* ---------------------------------------------------------------
+   3. THE LIGHTHOUSE (procedural primitives, centred at 0,0,0)
+---------------------------------------------------------------- */
+const lighthouse = new THREE.Group();
+scene.add(lighthouse);
+
+const stoneDark  = new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.9 });
+const stoneLight = new THREE.MeshStandardMaterial({ color: 0x7a6552, roughness: 0.85 });
+
+// Rocky base
+const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.9, 1.2, 24), stoneDark);
+base.position.y = 0.2;
+lighthouse.add(base);
+
+// Tapering tower built from 4 banded segments
+const rBot = 1.7, rTop = 1.0, towerH = 7, segs = 4;
+for (let i = 0; i < segs; i++) {
+  const r0 = rBot + (rTop - rBot) * (i / segs);
+  const r1 = rBot + (rTop - rBot) * ((i + 1) / segs);
+  const seg = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, towerH / segs, 32),
+                             i % 2 ? stoneDark : stoneLight);
+  seg.position.y = 0.8 + (i + 0.5) * (towerH / segs);
+  lighthouse.add(seg);
+}
+
+// Gallery, glowing lantern room, roof, finial
+const gallery = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.4, 0.25, 32), stoneDark);
+gallery.position.y = 7.9;
+lighthouse.add(gallery);
+
+const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.3, 20),
+                               new THREE.MeshBasicMaterial({ color: 0xfff2b0 }));
+lantern.position.y = 8.65;
+lighthouse.add(lantern);
+
+const roof = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.1, 20), stoneDark);
+roof.position.y = 9.85;
+lighthouse.add(roof);
+
+const finial = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), stoneDark);
+finial.position.y = 10.6;
+lighthouse.add(finial);
+
+// Lights: dim ambient so the silhouette reads, warm point light at the lantern
+scene.add(new THREE.AmbientLight(0x3a1c08, 1.2));
+const lampLight = new THREE.PointLight(0xffc040, 2.2, 45, 1.5);
+lampLight.position.set(0, 8.65, 0);
+scene.add(lampLight);
+
+// Volumetric-style beams: two opposed additive cones that rotate with the lamp
+const BEAM_LEN = 70;
+const beamGeo = new THREE.ConeGeometry(5, BEAM_LEN, 32, 1, true);
+beamGeo.translate(0, -BEAM_LEN / 2, 0);   // apex at origin
+beamGeo.rotateZ(Math.PI / 2);             // beam now points along +X
+const beamMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  vertexShader: `
+    varying vec3 vN, vV; varying float vX;
+    void main(){
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vN = normalize(normalMatrix * normal);
+      vV = normalize(-mv.xyz);
+      vX = position.x;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying vec3 vN, vV; varying float vX;
+    void main(){
+      float fres = pow(abs(dot(normalize(vN), normalize(vV))), 2.0);   // soft edges
+      float fade = (1.0 - vX / ${BEAM_LEN.toFixed(1)}) * smoothstep(0.0, 3.0, vX);
+      gl_FragColor = vec4(1.0, 0.8, 0.3, fres * fade * 0.2);
+    }`
+});
+const beamPivot = new THREE.Group();
+beamPivot.position.set(0, 8.65, 0);
+const beamA = new THREE.Mesh(beamGeo, beamMat);
+const beamB = new THREE.Mesh(beamGeo, beamMat);
+beamB.rotation.y = Math.PI;
+beamPivot.add(beamA, beamB);
+scene.add(beamPivot);
+
+/* ---------------------------------------------------------------
+   4. POST-PROCESSING: EffectComposer + custom Depth-of-Field pass
+      (Points can't use BokehPass's MeshDepthMaterial override, so the
+       scene is rendered once into a target with a real DepthTexture
+       and the DoF shader reads that depth directly.)
+---------------------------------------------------------------- */
+const rt = new THREE.WebGLRenderTarget(innerWidth * PR, innerHeight * PR, {
+  minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat
+});
+rt.depthTexture = new THREE.DepthTexture(innerWidth * PR, innerHeight * PR, THREE.UnsignedIntType);
+
+const composer = new THREE.EffectComposer(renderer, rt);
+composer.setPixelRatio(PR);
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new THREE.RenderPass(scene, camera));
+
+const DoFShader = {
+  uniforms: {
+    tDiffuse:  { value: null },
+    tDepth:    { value: null },
+    uNear:     { value: camera.near },
+    uFar:      { value: camera.far },
+    uFocus:    { value: 27 },        // focal distance (updated every frame -> lighthouse)
+    uAperture: { value: 0.05 },      // blur strength
+    uMaxBlur:  { value: 0.03 },      // max blur radius as a fraction of screen height
+    uRes:      { value: new THREE.Vector2(innerWidth * PR, innerHeight * PR) }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse, tDepth;
+    uniform float uNear, uFar, uFocus, uAperture, uMaxBlur;
+    uniform vec2 uRes;
+    varying vec2 vUv;
+
+    float linearDepth(float d){
+      float z = d * 2.0 - 1.0;
+      return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear));
+    }
+
+    void main(){
+      float z = linearDepth(texture2D(tDepth, vUv).x);
+      // Circle of confusion: grows with distance from the focal plane,
+      // so both the near foreground and the far background blur heavily.
+      float coc = min(uMaxBlur, uAperture * abs(z - uFocus) / z);
+      float radius = coc * uRes.y;                       // in pixels
+
+      vec3 acc = texture2D(tDiffuse, vUv).rgb;
+      float wsum = 1.0;
+      for (int i = 1; i < 40; i++){                       // golden-angle disc gather
+        float fi = float(i);
+        float a = fi * 2.39996;
+        vec2 o = vec2(cos(a), sin(a)) * sqrt(fi / 40.0) * radius / uRes;
+        vec3 c = texture2D(tDiffuse, vUv + o).rgb;
+        float w = 1.0 + dot(c, vec3(0.33)) * 2.0;         // bright points bloom into bokeh
+        acc += c * w; wsum += w;
+      }
+      vec3 col = acc / wsum;
+
+      col = 1.0 - exp(-col * 1.5);                        // soft tone-map
+      vec2 q = vUv - 0.5;
+      col *= 1.0 - dot(q, q) * 0.9;                       // vignette
+      gl_FragColor = vec4(col, 1.0);
+    }`
+};
+const dofPass = new THREE.ShaderPass(DoFShader);
+composer.addPass(dofPass);
+
+/* ---------------------------------------------------------------
+   5. RESIZE + ANIMATION LOOP
+---------------------------------------------------------------- */
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  dofPass.uniforms.uRes.value.set(w * PR, h * PR);
+  waveUniforms.uScale.value = (h * PR) / (2 * Math.tan(THREE.MathUtils.degToRad(FOV) / 2));
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Waves + rotating beam
+  waveUniforms.uTime.value = t;
+  const phi = t * 0.5;
+  beamPivot.rotation.y = phi;
+  waveUniforms.uBeam.value.set(Math.cos(phi), -Math.sin(phi));  // matches rotation about Y
+  lampLight.intensity = 2.0 + Math.sin(t * 7.0) * 0.1;           // faint flicker
+
+  // Keep the lighthouse in perfect focus as the user orbits/zooms
+  controls.update();
+  const focus = camera.position.distanceTo(controls.target);
+  waveUniforms.uFocus.value = focus;
+  dofPass.uniforms.uFocus.value = focus;
+  dofPass.uniforms.tDepth.value = composer.readBuffer.depthTexture;
+
+  composer.render();
+}
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Eight Pages</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georgia,'Times New Roman',serif;color:#ddd;user-select:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#box{position:relative;width:min(100vw,177.78vh);height:min(56.25vw,100vh);overflow:hidden;background:#000}
+#st,#vg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#st{image-rendering:pixelated;mix-blend-mode:screen;opacity:0}
+#vg{background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.85) 100%)}
+#pc{position:absolute;left:3%;top:4%;font-size:clamp(14px,1.8vw,26px);letter-spacing:.12em;opacity:.4;transition:opacity 1.5s}
+#hint{position:absolute;left:0;right:0;bottom:12%;text-align:center;opacity:0;letter-spacing:.3em;font-size:clamp(12px,1.4vw,20px);transition:opacity .2s}
+#msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.82);cursor:pointer;text-align:center;letter-spacing:.15em}
+#msg b{font-weight:normal;font-size:clamp(16px,2.4vw,34px);opacity:.75}
+#msg i{margin-top:1.2em;font-style:normal;font-size:clamp(11px,1.2vw,16px);opacity:.35}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="box">
+  <canvas id="st" width="96" height="54"></canvas>
+  <div id="vg"></div>
+  <div id="pc">Pages: 0 / 8</div>
+  <div id="hint">[ E ]</div>
+  <div id="msg"><b>Click to start (Requires Mouse Lock)</b><i>WASD move · Shift run · E take page · Esc pause</i></div>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),box=$('box'),R=THREE,TOTAL=8;
+const rnd=(a,b)=>a+Math.random()*(b-a),clamp=R.MathUtils.clamp;
+let yaw=0,pitch=0,got=0,sanity=1,state='menu',locked=false,distort=0,unseen=0,aim=null,t=0,fl=0,flk=1,filtOn=false;
+const keys={};
+
+/* ---------- renderer / scene / camera / flashlight ---------- */
+const renderer=new R.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setClearColor(0x000000);
+renderer.domElement.style.cssText='display:block;width:100%;height:100%';
+box.prepend(renderer.domElement);
+const scene=new R.Scene();
+scene.fog=new R.FogExp2(0x000000,.085);
+const cam=new R.PerspectiveCamera(65,16/9,.1,80);
+cam.rotation.order='YXZ';cam.position.set(0,1.7,0);scene.add(cam);
+const spot=new R.SpotLight(0xfff0d0,3.2,24,.3,.6,1);
+spot.position.set(.15,-.1,0);cam.add(spot);cam.add(spot.target);spot.target.position.set(0,0,-5);
+function resize(){const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+
+/* ---------- procedural textures ---------- */
+function tex(w,h,fn,rx,ry){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);
+  const T=new R.CanvasTexture(c);T.wrapS=T.wrapT=R.RepeatWrapping;T.repeat.set(rx,ry);return T}
+const gT=tex(256,256,(x,w,h)=>{const im=x.createImageData(w,h),d=im.data;
+  for(let i=0;i<d.length;i+=4){const v=14+Math.random()*46;d[i]=v*.8;d[i+1]=v;d[i+2]=v*.65;d[i+3]=255}
+  x.putImageData(im,0,0);
+  for(let i=0;i<260;i++){x.fillStyle=Math.random()<.5?'rgba(0,0,0,.18)':'rgba(70,80,50,.1)';x.beginPath();x.arc(rnd(0,w),rnd(0,h),rnd(2,14),0,7);x.fill()}},48,48);
+const bT=tex(64,256,(x,w,h)=>{x.fillStyle='#2a2119';x.fillRect(0,0,w,h);
+  for(let i=0;i<90;i++){x.fillStyle=Math.random()<.6?'rgba(0,0,0,.35)':'rgba(120,100,80,.18)';x.fillRect(rnd(0,w),0,rnd(1,4),h*rnd(.3,1))}
+  for(let i=0;i<500;i++){x.fillStyle='rgba(0,0,0,.2)';x.fillRect(rnd(0,w),rnd(0,h),2,2)}},2,4);
+const hT=tex(64,64,x=>{const g=x.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64)},1,1);
+const WORDS=["DON'T LOOK",'NO FACE','BEHIND YOU','HE SEES','FOLLOWS','RUN','TALL MAN','LEAVE'];
+const pageTex=()=>tex(128,176,(x,w,h)=>{x.fillStyle='#f4f1e6';x.fillRect(0,0,w,h);
+  for(let i=0;i<500;i++){x.fillStyle=`rgba(90,80,60,${rnd(.02,.12)})`;x.fillRect(rnd(0,w),rnd(0,h),rnd(1,6),rnd(1,6))}
+  x.strokeStyle='#111';x.lineWidth=3;x.beginPath();x.arc(64,34,8,0,7);
+  x.moveTo(64,42);x.lineTo(64,110);x.moveTo(64,55);x.lineTo(36,135);x.moveTo(64,55);x.lineTo(92,135);
+  x.moveTo(64,110);x.lineTo(54,150);x.moveTo(64,110);x.lineTo(74,150);x.stroke();
+  for(let i=0;i<8;i++){x.beginPath();x.moveTo(rnd(0,w),rnd(0,h));x.lineTo(rnd(0,w),rnd(0,h));x.lineWidth=1;x.stroke()}
+  x.fillStyle='#300';x.font='bold 15px serif';x.fillText(WORDS[Math.random()*8|0],10,168)},1,1);
+
+/* ---------- ground + trees ---------- */
+const ground=new R.Mesh(new R.PlaneGeometry(240,240),new R.MeshStandardMaterial({map:gT,roughness:1,metalness:0}));
+ground.rotation.x=-Math.PI/2;scene.add(ground);
+const barkM=new R.MeshStandardMaterial({map:bT,roughness:1}),trees=[];
+for(let i=0;i<170;i++){
+  let x,z;do{x=rnd(-60,60);z=rnd(-60,60)}while(Math.hypot(x,z)<5);
+  const r=rnd(.22,.5),h=rnd(9,15),m=new R.Mesh(new R.CylinderGeometry(r*.75,r,h,8),barkM);
+  m.position.set(x,h/2,z);m.rotation.y=Math.random()*6;scene.add(m);trees.push({x,z,r});
+}
+
+/* ---------- pages on tree trunks ---------- */
+const pgs=[],cand=trees.filter(q=>Math.abs(q.x)<42&&Math.abs(q.z)<42&&Math.hypot(q.x,q.z)>12),picked=[];
+for(let n=0;n<4000&&picked.length<TOTAL;n++){
+  const q=cand[Math.random()*cand.length|0];
+  if(!picked.includes(q)&&picked.every(p=>Math.hypot(p.x-q.x,p.z-q.z)>18))picked.push(q)}
+for(const q of cand){if(picked.length>=TOTAL)break;if(!picked.includes(q))picked.push(q)}
+picked.forEach(q=>{
+  const a=Math.random()*6.283,nx=Math.cos(a),nz=Math.sin(a),g=new R.Group(),rr=q.r*.95+.02;
+  g.position.set(q.x+nx*rr,rnd(1.3,1.9),q.z+nz*rr);g.rotation.y=Math.atan2(nx,nz);
+  const paper=new R.Mesh(new R.PlaneGeometry(.42,.58),new R.MeshBasicMaterial({map:pageTex()}));
+  const halo=new R.Mesh(new R.PlaneGeometry(1.6,1.6),new R.MeshBasicMaterial({map:hT,transparent:true,opacity:.2,blending:R.AdditiveBlending,depthWrite:false,fog:false}));
+  halo.position.z=.02;g.add(paper,halo);scene.add(g);pgs.push({g,paper,halo});
+});
+
+/* ---------- the Entity ---------- */
+const mB=new R.MeshBasicMaterial({color:0x0c0c0c}),mW=new R.MeshBasicMaterial({color:0xffffff}),ent=new R.Group();
+function bx(w,h,l,m,x,y,z,p){const o=new R.Mesh(new R.BoxGeometry(w,h,l),m);o.position.set(x,y,z);(p||ent).add(o);return o}
+bx(.2,1.7,.2,mB,-.15,.85,0);bx(.2,1.7,.2,mB,.15,.85,0);       // legs
+bx(.56,1.5,.32,mB,0,2.45,0);bx(.12,1.3,.02,mW,0,2.5,.17);      // torso + white shirt strip
+const head=bx(.3,.55,.3,mW,0,3.5,0);                             // faceless head
+function arm(sx,len,th,rz,rx,y){const g=new R.Group();g.position.set(sx*.3,y,0);
+  bx(th,len,th,mB,0,-len/2,0,g);bx(th*1.5,.5,th*1.5,mW,0,-len-.2,0,g);g.rotation.z=sx*rz;g.rotation.x=rx;ent.add(g)}
+arm(-1,2.7,.11,.1,.05,3.1);arm(1,2.7,.11,.1,-.05,3.1);          // impossibly long arms
+arm(-1,2.2,.06,.7,.4,3.0);arm(1,2.2,.06,.7,.4,3.0);             // extra thin back limbs
+scene.add(ent);
+
+function place(d){const a=yaw+Math.PI+rnd(-1.2,1.2);
+  ent.position.set(clamp(cam.position.x-Math.sin(a)*d,-58,58),0,clamp(cam.position.z-Math.cos(a)*d,-58,58))}
+const eSpeed=()=>1.2+.8*got;
+function diff(){scene.fog.density=.085+.014*got;spot.distance=24-1.6*got}
+place(30);diff();
+
+/* ---------- procedural audio ---------- */
+let AC,droneG,noiseG;
+function audio(){if(AC){AC.resume();return}
+  try{AC=new(window.AudioContext||window.webkitAudioContext)();
+    droneG=AC.createGain();droneG.gain.value=.05;droneG.connect(AC.destination);
+    [48,50.5,97].forEach(f=>{const o=AC.createOscillator(),lp=AC.createBiquadFilter();o.type='sawtooth';o.frequency.value=f;lp.frequency.value=180;o.connect(lp);lp.connect(droneG);o.start()});
+    const b=AC.createBuffer(1,AC.sampleRate,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const n=AC.createBufferSource(),g=AC.createGain();n.buffer=b;n.loop=true;g.gain.value=0;n.connect(g);g.connect(AC.destination);n.start();noiseG=g;
+  }catch(e){}}
+
+/* ---------- UI / state helpers ---------- */
+const sc=$('st'),sx=sc.getContext('2d'),sd=sx.createImageData(96,54);
+function stat(a){sc.style.opacity=a;if(a<.03)return;const d=sd.data;for(let i=0;i<d.length;i+=4){d[i]=d[i+1]=d[i+2]=Math.random()*255;d[i+3]=255}sx.putImageData(sd,0,0)}
+const show=h=>{$('msg').innerHTML=h;$('msg').style.display='flex'};
+function die(){if(state!=='play')return;state='dead';document.exitPointerLock();
+  ent.position.set(cam.position.x-Math.sin(yaw)*1.1,0,cam.position.z-Math.cos(yaw)*1.1);
+  ent.rotation.y=Math.atan2(cam.position.x-ent.position.x,cam.position.z-ent.position.z);pitch=.95;
+  setTimeout(()=>show('<b>IT FOUND YOU</b><i>Click to try again</i>'),1100)}
+function take(p){scene.remove(p.g);pgs.splice(pgs.indexOf(p),1);got++;
+  $('pc').textContent=`Pages: ${got} / ${TOTAL}`;$('pc').style.opacity=1;setTimeout(()=>$('pc').style.opacity=.4,1800);
+  if(got>=TOTAL){state='won';document.exitPointerLock();$('hint').style.opacity=0;show('<b>You made it out. For now.</b><i>Click to play again</i>');return}
+  diff();place(Math.max(9,22-got*1.6));unseen=0}
+
+/* ---------- input (native Pointer Lock API) ---------- */
+$('msg').addEventListener('click',()=>{
+  if(state==='dead'||state==='won'){location.reload();return}
+  audio();renderer.domElement.requestPointerLock()});
+document.addEventListener('pointerlockchange',()=>{
+  locked=document.pointerLockElement===renderer.domElement;
+  if(locked){state='play';$('msg').style.display='none'}
+  else if(state==='play'){state='menu';show('<b>Paused</b><i>Click to resume</i>')}});
+document.addEventListener('mousemove',e=>{if(!locked)return;yaw-=e.movementX*.0022;pitch=clamp(pitch-e.movementY*.0022,-1.45,1.45)});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyE'&&state==='play'&&aim)take(aim)});
+addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+
+/* ---------- main loop ---------- */
+const clk=new R.Clock(),fwd=new R.Vector3(),toE=new R.Vector3(),ray=new R.Raycaster();ray.far=3.2;
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clk.getDelta(),.05);t+=dt;
+  const p=cam.position,sh=()=>(Math.random()-.5)*distort*.03;
+  let dist=99,look=0,noise=0;
+  cam.rotation.set(pitch+sh(),yaw+sh(),0);
+
+  if(state==='play'){
+    const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0),run=keys.ShiftLeft||keys.ShiftRight;
+    if(f||s){const sp=(run?5.4:3.3)*dt/Math.hypot(f,s);
+      p.x+=(-Math.sin(yaw)*f+Math.cos(yaw)*s)*sp;p.z+=(-Math.cos(yaw)*f-Math.sin(yaw)*s)*sp}
+    p.x=clamp(p.x,-48,48);p.z=clamp(p.z,-48,48);
+    for(const q of trees){const dx=p.x-q.x,dz=p.z-q.z,m=q.r+.35,d2=dx*dx+dz*dz;
+      if(d2<m*m&&d2>1e-6){const d=Math.sqrt(d2);p.x=q.x+dx/d*m;p.z=q.z+dz/d*m}}
+    p.y=1.7+((f||s)?Math.sin(t*(run?11:7.5))*.035:0);
+
+    // Entity: dot product of camera direction and direction-to-entity
+    toE.set(ent.position.x-p.x,2.4-p.y,ent.position.z-p.z);dist=toE.length();toE.normalize();
+    cam.getWorldDirection(fwd);const dot=fwd.dot(toE);
+    const seen=dot>.6&&dist<45,staring=dot>.9&&dist<22;
+    if(!seen){                                  // off-screen: glide + periodic lunge
+      unseen+=dt;
+      const dx=p.x-ent.position.x,dz=p.z-ent.position.z,d=Math.hypot(dx,dz)||1;
+      let step=eSpeed()*dt;
+      if(unseen>Math.max(2.5,7-.55*got)){step+=2.5+.35*got;unseen=0}
+      ent.position.x+=dx/d*step;ent.position.z+=dz/d*step;
+      if(dist>40)place(26);
+    }
+    ent.rotation.y=Math.atan2(p.x-ent.position.x,p.z-ent.position.z);
+    if(staring){sanity-=dt*.1*(1+.12*got);look=1}else sanity=Math.min(1,sanity+dt*.02);
+    head.rotation.z=look?rnd(-.4,.4):0;
+    if(sanity<=0||Math.hypot(ent.position.x-p.x,ent.position.z-p.z)<1.4)die();
+
+    // dying flashlight: flicker grows with progress, low sanity and proximity
+    fl-=dt;if(fl<=0){fl=rnd(.05,.4);flk=Math.random()<.04+.02*got+(1-sanity)*.2+(dist<8?.15:0)?rnd(.05,.5):1}
+    spot.intensity=(3.2-.12*got)*flk;
+
+    // page detection
+    ray.setFromCamera({x:0,y:0},cam);
+    const hit=ray.intersectObjects(pgs.map(q=>q.paper));
+    aim=hit.length?pgs.find(q=>q.paper===hit[0].object):null;
+    $('hint').style.opacity=aim?0.7:0;
+  }else if(state==='dead'){look=1;noise=1}
+
+  pgs.forEach(q=>q.halo.material.opacity=.16+.07*Math.sin(t*3+q.g.position.x));
+
+  // screen distortion + static
+  distort+=(look-distort)*Math.min(1,dt*8);
+  const ins=1-sanity;
+  noise=Math.max(noise,distort*.55,ins*.35,dist<12?(12-dist)/12*.4:0);
+  if(distort>.02||ins>.05){
+    box.style.filter=`invert(${(distort*(Math.sin(t*40)>0?.95:.05)).toFixed(2)}) blur(${(distort*Math.random()*3+ins*1.5).toFixed(1)}px) contrast(${(1+distort*(1+Math.sin(t*25))+ins*.5).toFixed(2)}) hue-rotate(${(distort*Math.random()*80)|0}deg)`;filtOn=true;
+  }else if(filtOn){box.style.filter='none';filtOn=false}
+  stat(noise*.6);
+  if(noiseG){droneG.gain.value=.05+.01*got+(dist<15?(15-dist)*.004:0);noiseG.gain.value=noise*.22}
+
+  renderer.render(scene,cam);
+}
+loop();
+})();
+</script>
+</body>
+</html>

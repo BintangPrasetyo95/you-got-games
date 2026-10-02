@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Poolrooms - Level 37</title>
+<style>
+html,body{margin:0;height:100%;background:#0b2226;overflow:hidden;font-family:Georgia,serif}
+canvas{display:block}
+#ov{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(8,38,42,.88);color:#d9f6f4;text-align:center;cursor:pointer}
+#ov h1{font-weight:400;letter-spacing:.35em;margin:0;font-size:clamp(24px,5vw,52px)}
+#ov p{margin:0;opacity:.75;font-size:15px}
+#vig{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 35%,rgba(0,12,16,.96) 100%)}
+#hud{position:fixed;left:12px;top:10px;color:#fff;opacity:.6;font:13px monospace;text-shadow:0 0 4px #000;pointer-events:none}
+.hit{animation:hit .9s}
+@keyframes hit{0%{filter:none}12%{filter:invert(1) contrast(4) blur(2px);transform:scale(1.25) skewX(12deg)}30%{filter:hue-rotate(160deg) saturate(6) blur(6px);transform:scale(1.1) skewY(-8deg)}45%,75%{filter:brightness(0);transform:scale(1.4)}100%{filter:none;transform:none}}
+</style></head><body>
+<div id="ov"><h1>THE POOLROOMS</h1><p>Level 37. You are not alone.</p><p>WASD move, Shift sprint, mouse look, Esc pause</p><p><b>Click to enter</b></p></div>
+<div id="vig"></div><div id="hud"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* CHANGELOG (search these tags): [SPAWN RATE] CFG anomalies/rampSecs | [SCALE] deep-room CFG + Leviathan size | [BOTTOMLESS] floorH
+   [CEILING REMOVAL] makeChunk/buildChunk | [SLITHER] Leviathan.step/pose | [SURFACING] Leviathan.pose | [SHADER] LVM scaly skin
+   [COLOSSUS] 2x Leviathan scale (CFG lev*, Leviathan.spawn/step) | [SNAKE SKIN] opaque Voronoi-scale serpent shader (LVM) */
+/* ================= CONFIG - tweak these ================= */
+const CFG={
+ walkSpeed:2.6,    // m/s in shallow water
+ sprintMult:1.45,  // Shift multiplier
+ wadeDrag:3.0,     // accel/decel rate: LOWER = more sluggish wading
+ depthSlow:0.3,    // extra slowdown per metre of water depth
+ eyeHeight:1.6,    // eye height above the pool floor
+ fogDensity:0.03,  // FogExp2 density (keep >= 0.025 so chunk pop-in stays hidden)
+ fogColor:0xa9dcdc,
+ waveSpeed:0.8,    // water ripple animation speed
+ waveHeight:0.3,   // ripple strength (normal perturbation)
+ godray:0.6,       // godray intensity (0 = off)
+ sunTilt:0.5,      // slant of the light shafts
+ viewChunks:2,     // load radius in chunks (2 => 5x5 chunks of 32 m)
+ anomalies:2,      // [SPAWN RATE] max simultaneous anomalies (was 3); one more joins every rampSecs
+ anomalySpeed:2.0, // m/s (player walks 2.6, sprints ~3.8)
+ rampSecs:120, spawnMin:24, spawnMax:32, despawn:50, catchDist:0.9,
+ bobAmp:0.035,     // head-bob height (m)
+ stepLen:0.95,     // metres per footstep (bob + splash cycle)
+ breathAmp:0.012,  // idle breathing sway
+ strafeTilt:0.035, // view roll when strafing (rad)
+  // --- [NEW] deep water / buoyancy / leviathan ---
+ floatY:-0.2,       // body height while floating (water surface = 0)
+ floatEye:0.55,     // camera lift above floatY (0 => eyes truly below the surface)
+ swimMin:0.55,      // swim speed multiplier in deep water (0..1)
+ deepMin:20,        // floor deeper than this (m) counts as a "deep room" that can host the leviathan
+ deepSpacing:150,   // [SCALE] was 44 (~3.4x). [NEW] world is split into regions of this many cells (x4 m); each holds AT MOST ONE deep room. Keep >= 2*(deepRMax+2)
+ deepChance:0.65,   // chance a region gets a deep room (1 = every region, lower = rarer)
+ deepRMin:28, deepRMax:46, // [SCALE] was 8/13 (~3.5x): radius in cells (x4 m) => rooms ~224-368 m wide; centres are always >= 2*(deepRMax+2) cells (120 m) apart
+ abyssDepth:1000,   // [BOTTOMLESS] floor depth (m) deep inside a basin (was ~43)
+ abyssRamp:16,      // [BOTTOMLESS] cells from the cliff foot to full depth
+ // ---- [COLOSSUS] Leviathan: 2x bigger. deepRMin / deepRMax / deepSpacing above are UNCHANGED, so the basins are exactly the same size.
+ levSegs:144,       // [COLOSSUS] body segments: 72 -> 144 (2x) so the doubled body stays perfectly smooth (each segment is still ~6-10 m long)
+ levLen:4.0,        // [COLOSSUS] leviathan length = pool width x this: 2.0 -> 4.0 (~900-1470 m, i.e. 3-4 pool diameters: it has to coil in the abyss)
+ levGirth:0.028,    // [COLOSSUS] max body radius as a fraction of its length (unchanged fraction => girth also doubles: ~25-41 m radius)
+ levSpeed:0.0048,   // [COLOSSUS] head speed in body-lengths/s (was .0065): a colossus moves slower, ~4-7 m/s, so one full surfacing wave spans the body
+ levWave:0.02,      // [COLOSSUS] slither sway amplitude as a fraction of length (was a hard-coded .035): keeps the doubled body inside the basin
+ levTurn:2.0,       // [COLOSSUS] min turning radius in body radii (was 3.5): the doubled body would otherwise swing out of the (unchanged) basin
+ levBoost:2,        // [COLOSSUS] extra turn-rate the head gets near the edge of its patrol area (keeps the coils inside the basin)
+ levPatrol:0.12,    // [COLOSSUS] head patrol radius as a fraction of the basin radius (was .3)
+ levScales:128,     // [SNAKE SKIN] scales around the girth (high-frequency Voronoi cells; must be an integer so the pattern wraps seamlessly)
+ levGlow:1,         // [SNAKE SKIN] wet specular sheen multiplier (0 = matte)
+ anomalyFloor:-1.4, // humanoid anomalies float at this height instead of sinking into the abyss
+ fov:75, mouseSens:0.0022, volume:0.8, reverb:0.9,
+ seed:Math.random()*1e4|0
+};
+const C=4,N=8,CS=C*N,H=5; // cell size, cells per chunk side, chunk size, ceiling height
+
+/* ================= PROCEDURAL WORLD FUNCTIONS ================= */
+const hash=(x,z,s=0)=>{let h=Math.imul(x|0,374761393)+Math.imul(z|0,668265263)+Math.imul(CFG.seed+s,2246822519);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296};
+const vnoise=(x,z,s)=>{const xi=Math.floor(x),zi=Math.floor(z),fx=x-xi,fz=z-zi,u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz),a=hash(xi,zi,s),b=hash(xi+1,zi,s),c=hash(xi,zi+1,s),d=hash(xi+1,zi+1,s);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
+// cell type: 0 open, 1 pillar, 2 wall. Regions: tight cells (P=3), rooms (P=5), pillared halls.
+function cell(x,z){
+ if(deepE(x,z)>-4)return 0; // [NEW] no walls/pillars in or around deep rooms
+ const n=vnoise(x*.09,z*.09,7);
+ if(n>.64)return((x|z)&1)?0:1;                       // big open hall, pillar every 8 m
+ const P=n<.3?3:5,gx=((x%P)+P)%P,gz=((z%P)+P)%P;
+ if(gx&&gz)return 0;                                  // room interior
+ if(!gx&&!gz)return 2;                                // wall junction
+ return hash(x,z,3)<.4?0:2;                           // wall line with doorways
+}
+// [NEW] DEEP ROOMS, ONE PER REGION: the map is tiled into CFG.deepSpacing-cell regions. Each region rolls deepChance and, on success,
+// gets exactly one round basin whose centre is kept >= deepRMax+2 cells from the region edge -> basins never touch and no two
+// deep rooms (or leviathans) ever exist within 2*(deepRMax+2) cells (~120 m) of each other. Deterministic, so no state to store.
+function deepE(x,z){ // >0 inside a basin (cells from its rim), -99 if this region has none
+ const S=CFG.deepSpacing,gx=Math.floor(x/S),gz=Math.floor(z/S);
+ if(hash(gx,gz,31)>CFG.deepChance)return -99;
+ const m=CFG.deepRMax+2,rr=CFG.deepRMin+hash(gx,gz,32)*(CFG.deepRMax-CFG.deepRMin);
+ const cx=gx*S+m+hash(gx,gz,33)*(S-2*m),cz=gz*S+m+hash(gx,gz,34)*(S-2*m);
+ return rr-Math.hypot(x-cx,z-cz)+(vnoise(x*.15,z*.15,35)-.5)*4} // +noise = organic, uneven rim
+const deepT=(x,z)=>Math.min(1,Math.max(0,deepE(x,z)/4)); // 0 = normal floor, 1 = full abyss; /4 = cliff is ~4 cells wide (raise for a gentler slope)
+// [BOTTOMLESS] same shore as before (0 -> -42 m over the 4-cell cliff), then a 2nd smoothstep drops it to -CFG.abyssDepth deeper inside the basin
+const floorH=(x,z)=>{const e=deepE(x,z),t=Math.min(1,Math.max(0,e/4)),a=Math.min(1,Math.max(0,(e-4)/CFG.abyssRamp));
+ return -.2-Math.floor(vnoise(x*.08,z*.08,11)*4)*.3-t*t*(3-2*t)*42-a*a*(3-2*a)*(CFG.abyssDepth-42)};
+function blocked(x,z,r){
+ for(let i=0;i<4;i++){const X=x+(i&1?r:-r),Z=z+(i&2?r:-r),cx=Math.floor(X/C),cz=Math.floor(Z/C),t=cell(cx,cz);
+  if(t==2)return true;
+  if(t==1&&Math.abs(X-(cx+.5)*C)<.6&&Math.abs(Z-(cz+.5)*C)<.6)return true}
+ return false}
+
+/* ================= PROCEDURAL TEXTURES ================= */
+function tileTex(){ // seamless 4x4 ceramic tiles (1 m each), grout wraps cleanly
+ const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+ x.fillStyle='#9fb5b3';x.fillRect(0,0,256,256);
+ for(let j=0;j<4;j++)for(let i=0;i<4;i++){
+  const g=x.createLinearGradient(i*64,j*64,i*64+64,j*64+64),b=236+Math.random()*10|0;
+  g.addColorStop(0,`rgb(${b+6},${b+8},${b+4})`);g.addColorStop(1,`rgb(${b-14},${b-8},${b-8})`);
+  x.fillStyle=g;x.fillRect(i*64+2,j*64+2,60,60)}
+ for(let i=0;i<1500;i++){x.fillStyle=`rgba(90,120,120,${Math.random()*.08})`;x.fillRect(Math.random()*256,Math.random()*256,1.5,1.5)}
+ const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;return t}
+function ceilTex(){ // one chunk-sized ceiling with a round skylight (oculus) in the middle
+ const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');
+ x.fillStyle='#c4d4d2';x.fillRect(0,0,512,512);x.strokeStyle='#9db0ae';x.lineWidth=2;
+ for(let i=0;i<=512;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,512);x.moveTo(0,i);x.lineTo(512,i);x.stroke()}
+ x.fillStyle='#8aa09e';x.beginPath();x.arc(256,256,88,0,7);x.fill();
+ x.fillStyle='#fff';x.beginPath();x.arc(256,256,80,0,7);x.fill();
+ const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t}
+
+/* ================= SCENE ================= */
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);
+document.body.prepend(renderer.domElement);const cv=renderer.domElement;
+const scene=new THREE.Scene();scene.background=new THREE.Color(CFG.fogColor);scene.fog=new THREE.FogExp2(CFG.fogColor,CFG.fogDensity);
+const camera=new THREE.PerspectiveCamera(CFG.fov,innerWidth/innerHeight,.1,1400) /* [COLOSSUS] far 500->1400 so the 2x colossus is never clipped */;camera.rotation.order='YXZ';
+scene.add(new THREE.HemisphereLight(0xffffff,0x99cccc,.95));
+const SUN=new THREE.Vector3(-CFG.sunTilt,1,0).normalize();
+const sunL=new THREE.DirectionalLight(0xfff2d8,.55);sunL.position.copy(SUN);scene.add(sunL);
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()});
+
+// box geometry whose UVs are in metres, so tiles stay square on every face
+function box(w,h,d){const g=new THREE.BoxGeometry(w,h,d),u=g.attributes.uv,s=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];
+ for(let i=0;i<24;i++){const[a,b]=s[i>>2];u.setXY(i,u.getX(i)*a/4,u.getY(i)*b/4)}return g}
+const FH=48,floorGeo=box(C,FH,C),wallGeo=box(C,9,C),pilGeo=box(1.2,9,1.2);
+const tileMat=new THREE.MeshLambertMaterial({map:tileTex()});
+const ceilMat=new THREE.MeshBasicMaterial({map:ceilTex()});
+const ceilGeo=new THREE.PlaneGeometry(CS,CS);ceilGeo.rotateX(Math.PI/2);
+const waterGeo=new THREE.PlaneGeometry(CS,CS,N,N);waterGeo.rotateX(-Math.PI/2);
+// godray shaft: open cylinder, sheared along the sun direction
+const rayGeo=new THREE.CylinderGeometry(5,5,6,20,1,true);rayGeo.translate(0,2,0);
+{const p=rayGeo.attributes.position;for(let i=0;i<p.count;i++)p.setX(i,p.getX(i)+(5-p.getY(i))*CFG.sunTilt)}
+
+/* ================= WATER SHADER ================= */
+const SNOISE=`vec3 m289(vec3 x){return x-floor(x*(1./289.))*289.;}vec2 m289(vec2 x){return x-floor(x*(1./289.))*289.;}
+vec3 perm(vec3 x){return m289(((x*34.)+1.)*x);}
+float snoise(vec2 v){const vec4 C=vec4(.211324865405187,.366025403784439,-.577350269189626,.024390243902439);
+vec2 i=floor(v+dot(v,C.yy));vec2 x0=v-i+dot(i,C.xx);vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.);
+vec4 x12=x0.xyxy+C.xxzz;x12.xy-=i1;i=m289(i);
+vec3 p=perm(perm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.));
+vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.);m=m*m;m=m*m;
+vec3 x=2.*fract(p*C.www)-1.;vec3 h=abs(x)-.5;vec3 ox=floor(x+.5);vec3 a0=x-ox;
+m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
+vec3 g;g.x=a0.x*x0.x+h.x*x0.y;g.yz=a0.yz*x12.xz+h.yz*x12.yw;return 130.*dot(m,g);}`;
+const fogU=()=>({uFogC:{value:new THREE.Color(CFG.fogColor)},uFogD:{value:CFG.fogDensity}});
+const W=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
+ uniforms:Object.assign(fogU(),{uTime:{value:0},uSpd:{value:CFG.waveSpeed},uRip:{value:CFG.waveHeight},uSun:{value:SUN}}),
+ vertexShader:`attribute float aDepth;varying vec3 vW;varying float vD;
+ void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;vD=aDepth;gl_Position=projectionMatrix*viewMatrix*w;}`,
+ fragmentShader:`uniform float uTime,uSpd,uRip,uFogD;uniform vec3 uFogC,uSun;varying vec3 vW;varying float vD;`+SNOISE+`
+ // animated 2-octave simplex height field -> ripples
+ float wh(vec2 p){float t=uTime*uSpd;return snoise(p*.55+vec2(t*.35,t*.2))*.6+snoise(p*1.7-vec2(t*.5,-t*.3))*.25;}
+ void main(){
+  vec3 dv=cameraPosition-vW;float d=length(dv);vec3 V=dv/d;vec2 p=vW.xz;float e=.1,h0=wh(p);
+  float lod=1.-smoothstep(25.,60.,d);                       // fade ripples with distance (perf + less shimmer)
+  vec3 n=normalize(vec3((h0-wh(p+vec2(e,0.)))/e*uRip*lod,1.,(h0-wh(p+vec2(0.,e)))/e*uRip*lod));
+  float dep=smoothstep(0.,1.2,vD),ab=smoothstep(1.5,30.,vD); /*[NEW] ab = abyss factor: 0 shallow .. 1 at 30 m+*/                          // 0 = shallow, 1 = deep
+  float c=pow(max(1.-abs(snoise(p*1.3+n.xz*vD*3.+uTime*uSpd*.3)),0.),6.)*(1.-dep)*.5; // caustics through the refracting surface
+  vec3 body=mix(mix(vec3(.45,.92,.93),vec3(.02,.27,.33),dep)+c,vec3(0.),ab); /*[NEW] extreme depth -> black void*/ // light cyan -> dark teal by depth
+  vec3 R=reflect(-V,n);
+  vec3 sky=mix(vec3(.6,.85,.87),vec3(1.,.97,.9),smoothstep(0.,1.,R.y));
+  float F=.05+.95*pow(1.-max(dot(n,V),0.),4.);               // fresnel: reflection vs. see-through
+  vec3 col=mix(body,sky,F)+pow(max(dot(R,uSun),0.),90.)*.8;  // + sun glint
+  float a=mix(clamp(mix(.28,.86,dep)+F*.5,0.,1.),1.,ab);
+  float fg=(1.-exp(-uFogD*uFogD*d*d))*(1.-.85*ab*(1.-smoothstep(45.,70.,d))); /*[NEW] abyss resists fog so it stays black from afar (fog wins past 70 m to hide chunk edges)*/
+  gl_FragColor=vec4(mix(col,uFogC,fg),a);}`});
+const R=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,
+ uniforms:Object.assign(fogU(),{uTime:{value:0},uI:{value:CFG.godray*.35}}),
+ vertexShader:`varying vec3 vN,vMV,vP;varying float vH;
+ void main(){vN=normalize(normalMatrix*normal);vec4 m=modelViewMatrix*vec4(position,1.);vMV=m.xyz;vP=position;vH=clamp((position.y+1.)/6.,0.,1.);gl_Position=projectionMatrix*m;}`,
+ fragmentShader:`uniform float uTime,uI,uFogD;uniform vec3 uFogC;varying vec3 vN,vMV,vP;varying float vH;
+ void main(){float d=length(vMV);float ndv=abs(dot(normalize(vN),-vMV/d)); // soft silhouette edges
+  float streak=.75+.25*sin(atan(vP.z,vP.x)*9.+vP.y*.4+uTime*.25);
+  float a=uI*pow(ndv,1.5)*(.15+.85*smoothstep(0.,1.,vH))*streak*smoothstep(.4,4.,d)*exp(-uFogD*uFogD*d*d);
+  gl_FragColor=vec4(1.,.95,.8,a);}`});
+
+/* ================= CHUNKS (pooled: no allocation or GPU churn while streaming) ================= */
+const chunks=new Map(),pool=[],D=new THREE.Object3D();
+function makeChunk(){
+ const g=new THREE.Group(),im=(geo)=>{const m=new THREE.InstancedMesh(geo,tileMat,N*N);m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.frustumCulled=false;g.add(m);return m};
+ const ch={g,floor:im(floorGeo),walls:im(wallGeo),pil:im(pilGeo)};
+ const wg=waterGeo.clone();wg.setAttribute('aDepth',new THREE.BufferAttribute(new Float32Array((N+1)*(N+1)),1));
+ ch.water=new THREE.Mesh(wg,W);ch.water.position.set(CS/2,0,CS/2);ch.water.renderOrder=1;
+ const ce=new THREE.Mesh(ceilGeo,ceilMat);ce.position.set(CS/2,H,CS/2);
+ const ry=new THREE.Mesh(rayGeo,R);ry.position.set(CS/2,0,CS/2);ry.renderOrder=2;
+ g.add(ch.water,ce,ry);ch.ce=ce;ch.ry=ry;g.visible=false;scene.add(g);return ch}
+function buildChunk(ch,cx,cz){
+ ch.cx=cx;ch.cz=cz;const ox=cx*N,oz=cz*N;let nw=0,np=0,dp=false; // dp = chunk touches a deep room
+ ch.g.position.set(cx*CS,0,cz*CS);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const x=ox+i,z=oz+j,t=cell(x,z),px=i*C+C/2,pz=j*C+C/2;if(!dp)dp=deepE(x,z)>-4;
+  D.position.set(px,floorH(x,z)-FH/2,pz);D.updateMatrix();ch.floor.setMatrixAt(j*N+i,D.matrix);
+  if(t){D.position.set(px,.5,pz);D.updateMatrix();(t==2?ch.walls:ch.pil).setMatrixAt(t==2?nw++:np++,D.matrix)}}
+ ch.walls.count=nw;ch.pil.count=np;ch.floor.instanceMatrix.needsUpdate=ch.walls.instanceMatrix.needsUpdate=ch.pil.instanceMatrix.needsUpdate=true;
+ // [CEILING REMOVAL] chunks inside/overlapping a deep room (same zone where walls are removed) lose the ceiling and its godray shaft -> open foggy void
+ ch.ce.visible=ch.ry.visible=!dp;
+ const a=ch.water.geometry.attributes.aDepth; // water depth per vertex = average of the 4 surrounding floor cells
+ for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){let s=0;for(let k=0;k<4;k++)s+=floorH(ox+i-(k&1),oz+j-(k>>1));a.array[j*(N+1)+i]=Math.min(64,-s/4)} // [BOTTOMLESS] clamp: shader is fully black past 30 m
+ a.needsUpdate=true;ch.g.visible=true}
+for(let i=0;i<(2*CFG.viewChunks+1)**2;i++)pool.push(makeChunk());
+function updateChunks(px,pz,budget){ // recycle far chunks, build near ones (nearest first, `budget` per call)
+ const cx=Math.floor(px/CS),cz=Math.floor(pz/CS),Rr=CFG.viewChunks;
+ for(const[k,ch]of chunks)if(Math.abs(ch.cx-cx)>Rr||Math.abs(ch.cz-cz)>Rr){ch.g.visible=false;pool.push(ch);chunks.delete(k)}
+ for(let r=0;r<=Rr;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){
+  if(Math.max(Math.abs(dx),Math.abs(dz))!=r)continue;const k=(cx+dx)+','+(cz+dz);
+  if(chunks.has(k)||!pool.length||budget<=0)continue;const ch=pool.pop();buildChunk(ch,cx+dx,cz+dz);chunks.set(k,ch);budget--}}
+
+/* ================= ANOMALIES ================= */
+const anMat=new THREE.MeshBasicMaterial({color:0x020405});
+const AG={leg:new THREE.CylinderGeometry(.12,.2,1.2,8),tor:new THREE.CylinderGeometry(.2,.26,1,8),head:new THREE.SphereGeometry(.19,10,8),arm:new THREE.CylinderGeometry(.045,.035,1.5,6)};
+AG.arm.translate(0,-.75,0);
+const ans=[];
+for(let i=0;i<CFG.anomalies;i++){ // dark, featureless, long-armed figures
+ const g=new THREE.Group(),m=(geo,y)=>{const o=new THREE.Mesh(geo,anMat);o.position.y=y;g.add(o);return o};
+ m(AG.leg,.6);m(AG.tor,1.7);const hd=m(AG.head,2.45);hd.scale.y=1.35;
+ const arms=[-1,1].map(s=>{const p=new THREE.Group();p.position.set(s*.34,2.15,0);p.add(new THREE.Mesh(AG.arm,anMat));g.add(p);return p});
+ g.visible=false;scene.add(g);ans.push({g,hd,arms,on:false,ph:Math.random()*9,y:0})}
+function respawn(a){ // always behind the player (>=120 deg from view direction, so outside the FOV)
+ const ang=yaw+(Math.random()-.5)*2,d=CFG.spawnMin+Math.random()*(CFG.spawnMax-CFG.spawnMin);
+ a.g.position.set(P.x+Math.sin(ang)*d,0,P.z+Math.cos(ang)*d);a.y=Math.max(CFG.anomalyFloor,floorH(Math.floor(a.g.position.x/C),Math.floor(a.g.position.z/C)))}
+
+/* ================= [NEW] LEVIATHAN (colossal serpent) =================
+ [COLOSSUS] length = pool width x CFG.levLen (4.0 = 2x bigger), girth = length x CFG.levGirth, CFG.levSegs (144) segments, NO fins.
+ [SLITHER] the head wanders at constant speed; every segment sits exactly i*ds of path-length behind the head on its recorded trail + a slow travelling sine wave.
+ [SURFACING] a slow sine on the movement phase (this.ph) lifts the head to y=-0.5..0 then sinks it into the depths; segment i uses the phase
+   delayed by i*lag, so the whole body follows the same vertical path. All segments = ONE InstancedMesh (one draw call).
+ [SNAKE SKIN] LVM is now a FULLY OPAQUE, lit material (transparent:false, depthWrite:true, NO additive blending). Its fragment shader builds a
+   reptilian skin procedurally: seamless high-frequency Voronoi scales (bumped + keeled + cracked), simplex mottling in dark greens / olive /
+   brownish-black, pale olive belly, sun + sky lighting, wet specular sheen, and light distance haze. NOTE: opaque geometry is drawn before the
+   (transparent) water, so the part of the body below the surface is hidden by the black abyss water - the serpent visibly rises out of it. */
+const LVM=new THREE.ShaderMaterial({transparent:false,depthWrite:true,depthTest:true, // [SNAKE SKIN] opaque: no transparency, writes depth, blending removed
+ uniforms:Object.assign(fogU(),{uTime:{value:0},uPx:{value:700},uGlow:{value:CFG.levGlow},uSun:{value:SUN}}),
+ vertexShader:`attribute float aI; // aI = scale-row offset of this segment (keeps the scale grid continuous along the whole body)
+ varying vec3 vWN,vTa,vTl,vWp,vP;varying vec2 vS;
+ const float SC=${CFG.levScales.toFixed(1)}; // scales around the girth
+ void main(){mat3 M=mat3(instanceMatrix);vec3 s=vec3(length(M[0]),length(M[1]),length(M[2])); // per-axis ellipsoid radii
+  vec4 w=modelMatrix*instanceMatrix*vec4(position,1.);vWp=w.xyz;vP=position;
+  vWN=mat3(modelMatrix)*(M*(normal/(s*s)));        // world-space normal of the stretched ellipsoid
+  vTa=M*vec3(-position.y,position.x,0.);           // world direction of 'around the girth' (for scale bump mapping)
+  vTl=M[2]/s.z;                                    // world direction along the body (towards the head)
+  float sw=6.2831853*s.x/SC;                       // metres per scale around the body here
+  vS=vec2(aI-position.z*s.z/sw,sw);                // x = scale-row coordinate along the body, y = scale size in metres
+  gl_Position=projectionMatrix*viewMatrix*w;}`,
+ fragmentShader:`uniform float uTime,uFogD,uPx,uGlow;uniform vec3 uFogC,uSun;
+ varying vec3 vWN,vTa,vTl,vWp,vP;varying vec2 vS;
+ const float SC=${CFG.levScales.toFixed(1)};
+ `+SNOISE+`
+ vec2 h22(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);return fract((q.xx+q.yz)*q.zy);}
+ void main(){
+  vec3 dv=cameraPosition-vWp;float d=length(dv);vec3 V=dv/d,N=normalize(vWN);
+  float ang=atan(vP.y,vP.x),rl=length(vP.xy),up=rl>.001?vP.y/rl:0.; // ang = angle around the girth, up = +1 back .. -1 belly
+  float along=vS.x,px=vS.y*uPx/d;                                    // px = on-screen pixels per scale (drives level of detail)
+
+  // [SNAKE SKIN] seamless Voronoi scales: x wraps every SC cells (hash uses mod), cells are 1.5x longer than wide like real snake scales
+  vec2 P=vec2(ang*(SC/6.2831853),along/1.5);
+  float f1=.4,edge=.5;vec2 nq=vec2(0.),nid=floor(P);
+  if(px>1.){ // sub-pixel scales skip the 3x3 Voronoi search entirely (perf + no shimmer)
+   vec2 ip=floor(P),fp=P-ip;float a1=8.,a2=8.;
+   for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){
+    vec2 g=vec2(float(i),float(j)),cid=vec2(mod(ip.x+g.x,SC),ip.y+g.y);
+    vec2 r=g+(.12+.76*h22(cid))-fp;float dd=dot(r,r);
+    if(dd<a1){a2=a1;a1=dd;nq=-r;nid=cid;}else if(dd<a2)a2=dd;}
+   f1=sqrt(a1);edge=sqrt(a2)-f1;} // edge = distance to the nearest scale border (0 on the crack)
+  float lod=smoothstep(1.,3.,px);
+  float rn=h22(nid+7.3).x;
+
+  // [SNAKE SKIN] large-scale mottling with simplex noise (sampled on a circle around the girth => no seam)
+  vec2 nc=vec2(cos(ang),sin(ang))*.8;float al=along*.05;
+  float blot=snoise(nc+vec2(0.,al*.45)),mot=snoise(nc*2.6+vec2(5.2,al*1.5+3.1));
+  float dors=smoothstep(.05,.8,up),belly=1.-smoothstep(-.75,-.2,up);
+
+  // snake palette: dark greens, olive, brownish-black
+  vec3 cBlack=vec3(.026,.022,.016),cGreen=vec3(.05,.115,.04),cOlive=vec3(.2,.215,.065),cBrown=vec3(.125,.085,.038),cBelly=vec3(.55,.5,.29);
+  vec3 base=mix(cGreen,cOlive,smoothstep(-.3,.75,mot));                 // mottled green <-> olive
+  base=mix(base,cBrown,smoothstep(.15,.65,blot)*.8);                    // brown patches
+  base=mix(base,cBlack,(1.-smoothstep(-.55,.15,blot))*(.35+.55*dors));  // brownish-black saddles, strongest on the back
+  base=mix(base,cOlive*.85,(1.-abs(up))*.18);                           // slightly lighter flanks
+  base=mix(base,cBelly*(.75+.25*rn),belly*.85);                         // pale olive belly
+  base*=mix(1.,.62+.7*rn,lod);                                          // every scale a slightly different tone
+  float crack=mix(1.,smoothstep(.02,.17,edge),lod);
+  base*=mix(.14,1.,crack);                                              // dark gaps between scales
+  float keel=exp(-nq.x*nq.x*26.);                                       // raised ridge down the middle of each scale
+  base*=1.+.3*keel*lod;
+
+  // [SNAKE SKIN] scale bump: tilt the normal outwards from each scale's centre (pillow) so light rolls over every plate
+  vec3 Ta=normalize(vTa+vec3(1e-5)),Tl=normalize(-vTl);
+  vec3 Nn=normalize(N+(nq.x*Ta+nq.y*.66*Tl)*1.5*lod);
+
+  // lighting: hazy teal sky ambient, warm sun, wet specular sheen (glossier near the waterline), teal rim
+  float ndl=max(dot(Nn,uSun),0.);
+  vec3 amb=mix(vec3(.035,.05,.045),uFogC*.6,Nn.y*.5+.5);
+  vec3 H=normalize(uSun+V);
+  float wet=1.+1.6*(1.-smoothstep(0.,8.,vWp.y));
+  float spec=pow(max(dot(Nn,H),0.),42.)*.5*(.35+.65*keel)*crack*uGlow*wet;
+  float fr=pow(1.-max(dot(Nn,V),0.),3.);
+  vec3 col=base*(amb+vec3(1.,.93,.75)*ndl*.9)+spec*vec3(1.,.95,.8)+fr*uFogC*.14;
+  col=mix(vec3(.008,.04,.045),col,mix(.2,1.,smoothstep(-45.,-.5,vWp.y))); // darker with depth below the surface
+
+  // light distance haze: much thinner than the world fog (x.03) so the colossus stays readable from far away
+  float fg=1.-exp(-uFogD*uFogD*d*d*.03);
+  gl_FragColor=vec4(mix(col,uFogC,fg),1.);}`}); // [SNAKE SKIN] alpha = 1: fully opaque
+{const setPx=()=>LVM.uniforms.uPx.value=innerHeight*renderer.getPixelRatio()/(2*Math.tan(CFG.fov*Math.PI/360));setPx();addEventListener('resize',setPx)}
+const sst=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
+class Leviathan{
+ constructor(){
+  const n=this.n=CFG.levSegs,geo=new THREE.SphereGeometry(1,24,16); // [COLOSSUS] 16x12 -> 24x16 so the silhouette of a 30 m-thick body stays round up close
+  this.ai=new THREE.InstancedBufferAttribute(new Float32Array(n),1);geo.setAttribute('aI',this.ai); // [SNAKE SKIN] one float per segment: scale-row offset
+  this.m=new THREE.InstancedMesh(geo,LVM,n);this.m.frustumCulled=false;this.m.renderOrder=3; // opaque pass: renderOrder 3 = drawn after floors/walls so early-z culls hidden skin fragments
+  this.m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  this.s=Array.from({length:n},()=>({x:0,y:0,z:0,r:1,rz:1})); // body segments: world centre + radii (no fins any more)
+  this.cx=new Float64Array(n);this.cz=new Float64Array(n);this.tr=[]; // body centre-line (x,z) + the head's recorded trail
+  this.g=new THREE.Group();this.g.add(this.m);this.g.visible=false;scene.add(this.g);
+  this.on=false;this.tm=0;this.ph=0;this.wv=.031;this.dist=999;this.L=1;this.prox=100} // wv: surfacing rate (period ~200 s)
+ spawn(px,pz){ // look for a deep cell near the player, measure the basin, size + place the beast
+  const cx=Math.floor(px/C),cz=Math.floor(pz/C),R=(CFG.viewChunks+1)*N;let x=null,z=0,w=0;
+  for(let j=-R;j<=R&&x===null;j+=3)for(let i=-R;i<=R;i+=3)if(floorH(cx+i,cz+j)<-CFG.deepMin){x=cx+i;z=cz+j;break}
+  if(x===null)return;
+  for(let k=0;k<3;k++){ // measure pool extent along x/z, re-centre, repeat
+   const ext=(dx,dz)=>{let s=0;while(s<2*CFG.deepRMax+16&&floorH(x+dx*(s+1),z+dz*(s+1))<-3)s++;return s}; // [SCALE] cap was 60 cells
+   const l=ext(-1,0),r=ext(1,0),u=ext(0,-1),d=ext(0,1);
+   x+=Math.round((r-l)/2);z+=Math.round((d-u)/2);w=((l+r+u+d)/2+1)*C}
+  const n=this.n,L=this.L=w*CFG.levLen,ds=this.ds=L/(n-1),R0=L*CFG.levGirth,v=this.v=L*CFG.levSpeed,lam=L*.33; // [COLOSSUS] no Math.min(90,..), no *.5: L is 4x the pool width
+  this.R=w/2;this.mx=(x+.5)*C;this.mz=(z+.5)*C;
+  this.A=L*CFG.levWave;this.kw=6.2831853*ds/lam;this.ww=6.2831853*1.3*v/lam; // [SLITHER] wave amplitude, per-segment phase step, travel rate
+  this.Rp=Math.max(this.R*CFG.levPatrol,this.R-R0*1.5-this.A-30);this.turn=v/(CFG.levTurn*R0); // [COLOSSUS] tighter patrol + turn radius: the 2x body must coil INSIDE the unchanged basin // head patrol radius, max turn rate
+  this.dive=-(R0*3+40);this.lag=ds/v;this.prox=Math.max(80,R0*5);        // [SURFACING] dive depth, seconds for the head to travel one segment
+  let A=0,pr=0;
+  for(let i=0;i<n;i++){ // [SCALE] thick for ~40% of the length, then a long smooth taper into the tail
+   const t=i/(n-1),r=R0*(.6+.4*sst(0,.06,t))*(.03+.97*Math.pow(1-sst(.42,1,t),1.25)),rz=Math.max(r*1.15,ds*1.55),s=this.s[i];
+   s.r=r;s.rz=rz;if(i)A+=ds*CFG.levScales/(3.14159*(r+pr));pr=r; // [SNAKE SKIN] cumulative scale rows -> scale pattern is continuous along the body
+   this.ai.array[i]=A}
+  this.ai.needsUpdate=true;
+  const a0=Math.random()*6.28;this.hx=this.mx+Math.sin(a0)*this.Rp*.4;this.hz=this.mz+Math.cos(a0)*this.Rp*.4;this.hd=Math.random()*6.28;
+  this.tr=[];for(let k=L/2+8;k>=0;k--)this.tr.push({x:this.hx-Math.sin(this.hd)*k*2,z:this.hz-Math.cos(this.hd)*k*2}); // straight seed trail, replaced by the pre-swim
+  this.ph=Math.random()*200;for(let k=0;k<L/v*1.1;k+=.5)this.step(.5); // pre-swim so the body already lies on a real, curved trail
+  this.pose(px,pz);this.on=this.g.visible=true}
+ step(dt){ // head: constant speed, slow wandering turns, soft steer back to the basin centre; its path is recorded every 2 m
+  const t=this.ph+=dt,dx=this.mx-this.hx,dz=this.mz-this.hz;
+  let w=.032*Math.sin(t*.021+1)+.02*Math.sin(t*.0137+4),df=Math.atan2(dx,dz)-this.hd;df-=6.2831853*Math.round(df/6.2831853);
+  w+=df*sst(.6*this.Rp,this.Rp,Math.hypot(dx,dz))*.5;const tb=this.turn*(1+CFG.levBoost*sst(.5*this.Rp,1.2*this.Rp,Math.hypot(dx,dz))); // [COLOSSUS] turn rate ramps up near the patrol edge
+  this.hd+=Math.max(-tb,Math.min(tb,w))*dt;
+  const q=this.tr,l=q[q.length-1];this.hx+=Math.sin(this.hd)*this.v*dt;this.hz+=Math.cos(this.hd)*this.v*dt;
+  if(Math.hypot(this.hx-l.x,this.hz-l.z)>=2){q.push({x:this.hx,z:this.hz});if(q.length>this.L/2+8)q.shift()}}
+ trail(){ // [SLITHER] place segment i exactly i*ds of path-length behind the head, walking back along the recorded trail (no corner cutting)
+  const q=this.tr,X=this.cx,Z=this.cz,ds=this.ds;let px=this.hx,pz=this.hz,j=q.length-1,acc=0,i=1;X[0]=px;Z[0]=pz;
+  while(i<this.n&&j>=0){const c=q[j],d=Math.hypot(c.x-px,c.z-pz);
+   if(d>0&&acc+d>=i*ds){const k=(i*ds-acc)/d;X[i]=px+(c.x-px)*k;Z[i]=pz+(c.z-pz)*k;i++}else{acc+=d;px=c.x;pz=c.z;j--}}
+  for(;i<this.n;i++){X[i]=X[i-1];Z[i]=Z[i-1]}} // safety fill only: the seeded trail is always longer than the body
+ pose(px,pz){
+  this.trail();const n=this.n,S=this.s,X=this.cx,Z=this.cz,e=this.m.instanceMatrix.array,ph=this.ph;let dm=1e9;
+  for(let i=0;i<n;i++){
+   const a=X[Math.max(i-2,0)]-X[Math.min(i+2,n-1)],b=Z[Math.max(i-2,0)]-Z[Math.min(i+2,n-1)],l=Math.hypot(a,b)||1,t=i/(n-1),s=S[i],
+    // [SLITHER] slow sine travelling head->tail, calm at the head, widest mid-body, damped at the tail
+    off=this.A*(.2+.8*sst(0,.25,t))*(1-.5*sst(.55,1,t))*Math.sin(this.kw*i-this.ww*ph),
+    // [SURFACING] p = phase this spot had when the head passed it. u: slow sine 0..1 (smoothstepped), y: dive depth -> water surface (-0.5..0 with a gentle bob)
+    p=ph-i*this.lag,u=.5+.5*Math.sin(p*this.wv),k=u*u*(3-2*u);
+   s.x=X[i]+b/l*off;s.z=Z[i]-a/l*off;s.y=this.dive+(-.25+.25*Math.sin(p*.8)-this.dive)*k}
+  for(let i=0;i<n;i++){ // orient each ellipsoid along the body (z = towards head), then write its instance matrix
+   const s=S[i],h=S[Math.max(i-1,0)],q=S[Math.min(i+1,n-1)];let fx=h.x-q.x,fy=h.y-q.y,fz=h.z-q.z;
+   const f=Math.hypot(fx,fy,fz)||1,xl=Math.hypot(fx,fz)||1;fx/=f;fy/=f;fz/=f;
+   const xx=fz*f/xl,xz=-fx*f/xl,o=i*16,rx=s.r,ry=s.r*.9,rz=s.rz;
+   e[o]=xx*rx;e[o+1]=0;e[o+2]=xz*rx;e[o+3]=0;
+   e[o+4]=fy*xz*ry;e[o+5]=(fz*xx-fx*xz)*ry;e[o+6]=-fy*xx*ry;e[o+7]=0;
+   e[o+8]=fx*rz;e[o+9]=fy*rz;e[o+10]=fz*rz;e[o+11]=0;e[o+12]=s.x;e[o+13]=s.y;e[o+14]=s.z;e[o+15]=1;
+   dm=Math.min(dm,Math.hypot(s.x-px,s.y-.3,s.z-pz)-s.r)}
+  this.m.instanceMatrix.needsUpdate=true;this.dist=Math.max(0,dm)}
+ update(dt,px,pz){
+  if(!this.on){if((this.tm-=dt)<0){this.tm=1.5;this.spawn(px,pz)}return}
+  this.step(dt);this.pose(px,pz);
+  if(Math.hypot(px-this.mx,pz-this.mz)>this.R+150)this.on=this.g.visible=false}} // despawn relative to the (huge) basin, not the head
+const lev=new Leviathan();
+
+/* ================= AUDIO (all synthesized) ================= */
+let AC,master,verb,nbuf,dread,abyss; // abyss = [NEW] underwater drone gain
+const out=n=>{n.connect(master);n.connect(verb)}; // dry + reverb send
+function initAudio(){
+ AC=new(window.AudioContext||window.webkitAudioContext)();
+ master=AC.createGain();master.gain.value=CFG.volume;master.connect(AC.destination);
+ const sr=AC.sampleRate;nbuf=AC.createBuffer(1,sr*2,sr);const d=nbuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+ const L=sr*4,ir=AC.createBuffer(2,L,sr); // 4 s decaying-noise impulse response = huge echoing hall
+ for(let c=0;c<2;c++){const a=ir.getChannelData(c);for(let i=0;i<L;i++)a[i]=(Math.random()*2-1)*Math.pow(1-i/L,3)}
+ verb=AC.createConvolver();verb.buffer=ir;const vg=AC.createGain();vg.gain.value=CFG.reverb;verb.connect(vg);vg.connect(master);
+ const layer=(type,f,gain,lfo)=>{const s=AC.createBufferSource();s.buffer=nbuf;s.loop=true;const fl=AC.createBiquadFilter();fl.type=type;fl.frequency.value=f;
+  const g=AC.createGain();g.gain.value=gain;const o=AC.createOscillator(),og=AC.createGain();o.frequency.value=lfo;og.gain.value=gain*.5;o.connect(og);og.connect(g.gain);o.start();
+  s.connect(fl);fl.connect(g);out(g);s.start()};
+ layer('lowpass',350,.35,.07);layer('bandpass',2200,.05,.11); // room rumble + airy hiss
+ const drone=(f,g)=>{const o=AC.createOscillator(),n=AC.createGain();o.frequency.value=f;n.gain.value=g;o.connect(n);out(n);o.start();return n};
+ drone(55,.04);dread=drone(38,0);
+ { // [NEW] ABYSS DRONE: two slowly-wobbling sub-bass oscillators + lowpassed noise; gain is driven per-frame (silent until you float over deep water)
+  abyss=AC.createGain();abyss.gain.value=0;out(abyss);
+  [31,46.5].forEach((f,i)=>{const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain();o.type=i?'triangle':'sine';o.frequency.value=f;
+   l.frequency.value=.09+i*.05;lg.gain.value=f*.03;l.connect(lg);lg.connect(o.frequency);l.start();o.connect(abyss);o.start()});
+  const ns=AC.createBufferSource(),lp=AC.createBiquadFilter();ns.buffer=nbuf;ns.loop=true;lp.type='lowpass';lp.frequency.value=120;ns.connect(lp);lp.connect(abyss);ns.start()} // dread drone swells when anomalies are close
+ (function drip(){const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(1500+Math.random()*1500,t);o.frequency.exponentialRampToValueAtTime(600,t+.12);
+  g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.25);o.connect(g);out(g);o.start(t);o.stop(t+.3);setTimeout(drip,2000+Math.random()*5000)})();
+}
+function splash(v){ // filtered noise burst, called once per footstep (synced to the head bob)
+ if(!AC)return;const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=nbuf;f.type='bandpass';f.Q.value=.9;
+ f.frequency.setValueAtTime(400+Math.random()*500,t);f.frequency.exponentialRampToValueAtTime(1800+Math.random()*1200,t+.25);
+ g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.3*v,t+.03);g.gain.exponentialRampToValueAtTime(.001,t+.45);
+ s.connect(f);f.connect(g);out(g);s.start(t,Math.random(),.6)}
+function sndHit(){if(!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='sawtooth';o.frequency.setValueAtTime(500,t);o.frequency.exponentialRampToValueAtTime(30,t+.8);
+ g.gain.setValueAtTime(.35,t);g.gain.exponentialRampToValueAtTime(.001,t+.9);o.connect(g);out(g);o.start(t);o.stop(t+1);splash(2)}
+
+/* ================= PLAYER / INPUT ================= */
+const P={x:0,z:0},keys={},ov=document.getElementById('ov'),vig=document.getElementById('vig'),hud=document.getElementById('hud');
+let yaw=0,pitch=0,vx=0,vz=0,eyeY=1.5,bobPh=0,lastStep=0,tilt=0,fk=0,T=0,catches=0,hitCool=0,started=false,paused=true,locked=false,fallback=false,drag=false,lastSec=-1;
+function teleport(){ // random open cell far away
+ let x,z;do{x=Math.floor((Math.random()-.5)*1500);z=Math.floor((Math.random()-.5)*1500)}while(cell(x,z)||deepT(x,z)>0); // [NEW] never respawn inside a deep room
+ P.x=(x+.5)*C;P.z=(z+.5)*C;vx=vz=0;yaw=Math.random()*6.28;eyeY=floorH(x,z)+CFG.eyeHeight;updateChunks(P.x,P.z,999)}
+function caught(){
+ if(hitCool>0)return;hitCool=2;catches++;cv.classList.remove('hit');void cv.offsetWidth;cv.classList.add('hit');sndHit();
+ setTimeout(()=>{teleport();ans.forEach(a=>a.on&&respawn(a))},500)} // reset while the screen is blacked out
+addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('mousedown',()=>drag=true);addEventListener('mouseup',()=>drag=false);
+addEventListener('mousemove',e=>{if(!started||paused||!(locked||(fallback&&drag)))return;yaw-=e.movementX*CFG.mouseSens;pitch=Math.max(-1.45,Math.min(1.45,pitch-e.movementY*CFG.mouseSens))});
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===cv;if(!locked&&started&&!fallback){paused=true;ov.querySelector('b').textContent='Click to resume';ov.style.display='flex'}});
+document.addEventListener('pointerlockerror',()=>fallback=true); // sandboxed iframe: drag mouse to look instead
+ov.onclick=()=>{if(!AC)initAudio();AC.resume();started=true;paused=false;ov.style.display='none';
+ try{Promise.resolve(cv.requestPointerLock()).catch(()=>fallback=true)}catch(e){fallback=true}};
+
+/* ================= MAIN LOOP ================= */
+function update(dt){
+ T+=dt;hitCool-=dt;
+ const fw=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),st=(keys.KeyD?1:0)-(keys.KeyA?1:0),sn=Math.sin(yaw),cs=Math.cos(yaw);
+ let wx=-sn*fw+cs*st,wz=-cs*fw-sn*st;const wl=Math.hypot(wx,wz);if(wl>1){wx/=wl;wz/=wl}
+ const cx=Math.floor(P.x/C),cz=Math.floor(P.z/C),fh=floorH(cx,cz),depth=-fh;
+ const sp=CFG.walkSpeed*((keys.ShiftLeft||keys.ShiftRight)?CFG.sprintMult:1)*Math.max(CFG.swimMin,1-depth*CFG.depthSlow);
+ const k=1-Math.exp(-CFG.wadeDrag*dt);vx+=(wx*sp-vx)*k;vz+=(wz*sp-vz)*k; // sluggish water inertia
+ const nx=P.x+vx*dt;if(!blocked(nx,P.z,.35))P.x=nx;else vx=0;
+ const nz=P.z+vz*dt;if(!blocked(P.x,nz,.35))P.z=nz;else vz=0;
+ updateChunks(P.x,P.z,2);
+ // head bob, breathing, strafe tilt
+ const spd=Math.hypot(vx,vz),mv=Math.min(1,spd/1.2);bobPh+=spd*dt*Math.PI/CFG.stepLen;
+ const sid=Math.floor((bobPh+Math.PI/4)/Math.PI);if(sid!=lastStep){lastStep=sid;if(spd>.4)splash(Math.min(1,spd/CFG.walkSpeed)*(1-.5*fk))}
+ const bob=Math.sin(bobPh*2)*CFG.bobAmp*mv,sway=Math.cos(bobPh)*CFG.bobAmp*.6*mv,br=Math.sin(T*1.4)*(1-mv);
+ // [NEW] BUOYANCY: eye = the higher of "standing on the floor" and "floating at the surface".
+ // Floor drops away -> eye holds at floatY+floatEye (fk -> 1 = swimming); floor rises -> you smoothly wade back out.
+ const stand=fh+CFG.eyeHeight,surf=CFG.floatY+CFG.floatEye;fk+=((stand<surf?1:0)-fk)*Math.min(1,dt*3);
+ tilt+=(-st*CFG.strafeTilt-tilt)*Math.min(1,dt*6);eyeY+=(Math.max(stand,surf)-eyeY)*Math.min(1,dt*6);
+ camera.position.set(P.x+cs*sway,eyeY+bob*(1-fk)+br*CFG.breathAmp+fk*Math.sin(T*1.1)*.06,P.z-sn*sway); // [NEW] slow swell replaces footstep bob while floating
+ camera.rotation.set(pitch+br*.004,yaw,tilt+br*.002+fk*Math.sin(T*.7)*.012);
+ // anomalies
+ let near=99;
+ ans.forEach((a,i)=>{
+  if(!a.on){if(T>3+i*CFG.rampSecs){a.on=a.g.visible=true;respawn(a)}return}
+  const dx=P.x-a.g.position.x,dz=P.z-a.g.position.z,d=Math.hypot(dx,dz);
+  if(d>CFG.despawn){respawn(a);return}
+  const s=CFG.anomalySpeed*dt/d;a.g.position.x+=dx*s;a.g.position.z+=dz*s;a.g.rotation.y=Math.atan2(dx,dz); // silent, relentless
+  a.y+=(Math.max(CFG.anomalyFloor,floorH(Math.floor(a.g.position.x/C),Math.floor(a.g.position.z/C)))-a.y)*Math.min(1,dt*5);
+  a.ph+=dt*3;a.g.position.y=a.y+Math.sin(a.ph*2)*.04;
+  a.arms[0].rotation.x=Math.sin(a.ph)*.35;a.arms[1].rotation.x=-Math.sin(a.ph)*.35;a.hd.rotation.z=Math.sin(a.ph*.5)*.25;
+  near=Math.min(near,d);if(d<CFG.catchDist)caught()});
+ const danger=Math.max(0,1-near/18);
+ // [NEW] leviathan patrol + abyss drone (swells with water depth under you and with leviathan proximity)
+ lev.update(dt,P.x,P.z);LVM.uniforms.uTime.value=T;
+ const lp=lev.on?Math.max(0,1-lev.dist/lev.prox)*fk /* [SCALE] proximity = distance to nearest body segment */:0;
+ if(abyss)abyss.gain.setTargetAtTime(fk*(.06+.3*Math.min(1,depth/40))+lp*.25,AC.currentTime,.5);
+ vig.style.opacity=Math.max(danger*.9,lp*.6);
+ if(dread)dread.gain.setTargetAtTime(danger*.25,AC.currentTime,.3);
+ W.uniforms.uTime.value=R.uniforms.uTime.value=T;
+ const sec=T|0;if(sec!=lastSec){lastSec=sec;hud.textContent=`survived ${String(sec/60|0).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}   caught ${catches}`}}
+teleport();camera.position.set(P.x,eyeY,P.z);camera.rotation.y=yaw;
+let last=performance.now();
+(function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/1000,.05);last=now;
+ if(started&&!paused)update(dt);renderer.render(scene,camera)})(last);
+</script></body></html>
