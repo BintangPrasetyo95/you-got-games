@@ -1,18 +1,18 @@
 /* =====================================================================
-   YOU GOT GAMES — Universal In-Game Navigation & Pause Overlay
+   YOU GOT GAMES? — Universal In-Game Navigation & Pause Overlay
    ===================================================================== */
 
 :root {
   --hub-glow: rgba(255, 255, 255, 0.2);
 }
 
-/* Floating Back Button (Top-Left HUD) */
+/* Floating Back Button (Hidden during active gameplay; only shown when paused if no return button exists) */
 .hub-back-btn {
   position: fixed;
   top: 16px;
   left: 16px;
   z-index: 10000;
-  display: inline-flex;
+  display: none; /* Removed from active gameplay */
   align-items: center;
   gap: 9px;
   padding: 8px 16px 8px 12px;
@@ -32,6 +32,10 @@
   user-select: none;
   -webkit-user-select: none;
   cursor: pointer;
+}
+
+.hub-back-btn.active-pause {
+  display: inline-flex;
 }
 
 .hub-back-btn:hover {
@@ -95,36 +99,10 @@
   pointer-events: all;
 }
 
-/* Spread-out decorative stars in pause background */
-.hub-spread-stars {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 1;
-}
-
+/* Spread-out decorative stars removed (disabled) */
+.hub-spread-stars,
 .hub-spread-star {
-  position: absolute;
-  opacity: 0.22;
-  filter: drop-shadow(0 0 12px var(--hub-glow));
-  animation: hubStarFloat 8s ease-in-out infinite alternate;
-  will-change: transform, opacity;
-}
-
-.hub-spread-star:nth-child(1) { top: 12%; left: 10%; width: 55px; height: 55px; animation-duration: 7s; }
-.hub-spread-star:nth-child(2) { top: 22%; right: 14%; width: 44px; height: 44px; animation-duration: 9s; animation-delay: -2s; }
-.hub-spread-star:nth-child(3) { bottom: 18%; left: 15%; width: 60px; height: 60px; animation-duration: 8.5s; animation-delay: -3.5s; }
-.hub-spread-star:nth-child(4) { bottom: 25%; right: 12%; width: 50px; height: 50px; animation-duration: 10s; animation-delay: -1s; }
-.hub-spread-star:nth-child(5) { top: 48%; left: 6%; width: 36px; height: 36px; animation-duration: 6s; animation-delay: -4s; }
-.hub-spread-star:nth-child(6) { top: 52%; right: 7%; width: 40px; height: 40px; animation-duration: 7.5s; animation-delay: -5s; }
-.hub-spread-star:nth-child(7) { top: 8%; left: 48%; width: 42px; height: 42px; animation-duration: 8s; animation-delay: -2.5s; }
-.hub-spread-star:nth-child(8) { bottom: 10%; left: 52%; width: 38px; height: 38px; animation-duration: 9.5s; animation-delay: -6s; }
-
-@keyframes hubStarFloat {
-  0% { transform: translateY(0) rotate(0deg) scale(0.95); opacity: 0.18; }
-  50% { transform: translateY(-16px) rotate(15deg) scale(1.05); opacity: 0.35; }
-  100% { transform: translateY(12px) rotate(-10deg) scale(1); opacity: 0.22; }
+  display: none !important;
 }
 
 /* Pause Card */
@@ -150,11 +128,11 @@
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-/* Hero Center Icon */
+/* Hero Center Icon (Static, Clean, No Glow) */
 .hub-hero-star-wrapper {
   position: relative;
-  width: 110px;
-  height: 110px;
+  width: 104px;
+  height: 104px;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -162,31 +140,16 @@
 }
 
 .hub-hero-star-glow {
-  position: absolute;
-  inset: -15px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--hub-glow) 0%, transparent 70%);
-  animation: hubGlowPulse 2.8s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-
-@keyframes hubGlowPulse {
-  0% { transform: scale(0.9); opacity: 0.5; }
-  100% { transform: scale(1.3); opacity: 0.95; }
+  display: none !important;
 }
 
 .hub-hero-star {
   position: relative;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 6px 20px var(--hub-glow));
-  animation: hubHeroPulse 3.5s ease-in-out infinite alternate;
-}
-
-@keyframes hubHeroPulse {
-  0% { transform: scale(0.96) rotate(-2deg); }
-  50% { transform: scale(1.04) rotate(4deg); }
-  100% { transform: scale(0.98) rotate(-1deg); }
+  filter: none !important;
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Titles */

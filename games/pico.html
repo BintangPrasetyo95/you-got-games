@@ -6,12 +6,230 @@
 <link rel="stylesheet" href="hub-nav.css">
 <style>
   /* Reset margins, dark background, center the canvas */
-  html, body { margin:0; height:100%; background:#0a0a14; overflow:hidden; }
-  body { display:flex; align-items:center; justify-content:center; }
-  canvas { width:min(100vw, calc(100vh * 16 / 9)); aspect-ratio:16/9; background:#000; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0a0a14;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16/9; background: #000; display: block; }
+
+  /* In-game Pause/Menu HUD button */
+  .pico-hud-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(16, 20, 36, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 9999px;
+    color: #f1f5f9;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+  }
+  .pico-hud-btn:hover {
+    background: rgba(28, 34, 58, 0.95);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  }
+  .pico-hud-btn kbd {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  /* Overlay Menus (Start & Win) */
+  .pico-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(10, 10, 20, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #fff;
+    user-select: none;
+  }
+  .pico-card {
+    background: rgba(18, 22, 38, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 28px;
+    padding: 38px 44px;
+    max-width: 560px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  }
+  .pico-star-icon {
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 12px;
+  }
+  .pico-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+    color: #ffffff;
+  }
+  .pico-sub {
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0 0 24px;
+  }
+  .pico-desc {
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 24px;
+  }
+  .pico-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+    text-align: left;
+  }
+  .pico-player-box {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pico-player-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pico-player-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+  .pico-player-name {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pico-player-keys {
+    font-family: monospace;
+    font-size: 12px;
+    display: flex;
+    gap: 4px;
+  }
+  .pico-player-keys span {
+    background: rgba(255, 255, 255, 0.12);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #f1f5f9;
+  }
+  .pico-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
 </style>
 </head>
 <body>
+
+<!-- HUD Menu Button -->
+<button id="picoMenuBtn" type="button" class="pico-hud-btn" title="Open Pause Menu (Esc or P)">
+  <span>Menu</span>
+  <kbd>Esc</kbd>
+</button>
+
+<!-- Start Menu Screen -->
+<div id="picoStartMenu" class="pico-overlay">
+  <div class="pico-card">
+    <div id="pico-star-icon" class="pico-star-icon"></div>
+    <h1 class="pico-title">STACK PARK</h1>
+    <p class="pico-sub">4-Player Co-op Puzzle Platformer</p>
+    <p class="pico-desc">
+      All 4 players share one keyboard. Push teammates, hop across heads to stack high, hit buttons to open gates, and guide all four into the purple exit door!
+    </p>
+
+    <div class="pico-controls-grid">
+      <div class="pico-player-box">
+        <div class="pico-player-meta">
+          <span class="pico-player-dot" style="background:#e53935;"></span>
+          <span class="pico-player-name">P1 Red</span>
+        </div>
+        <div class="pico-player-keys"><span>W</span><span>A</span><span>D</span></div>
+      </div>
+      <div class="pico-player-box">
+        <div class="pico-player-meta">
+          <span class="pico-player-dot" style="background:#1e88e5;"></span>
+          <span class="pico-player-name">P2 Blue</span>
+        </div>
+        <div class="pico-player-keys"><span>↑</span><span>←</span><span>→</span></div>
+      </div>
+      <div class="pico-player-box">
+        <div class="pico-player-meta">
+          <span class="pico-player-dot" style="background:#43a047;"></span>
+          <span class="pico-player-name">P3 Green</span>
+        </div>
+        <div class="pico-player-keys"><span>I</span><span>J</span><span>L</span></div>
+      </div>
+      <div class="pico-player-box">
+        <div class="pico-player-meta">
+          <span class="pico-player-dot" style="background:#fdd835;"></span>
+          <span class="pico-player-name">P4 Yellow</span>
+        </div>
+        <div class="pico-player-keys"><span>T</span><span>F</span><span>H</span></div>
+      </div>
+    </div>
+
+    <div class="pico-btn-group">
+      <button id="picoStartBtn" type="button" class="hub-btn hub-btn-primary">
+        Start Co-op
+      </button>
+      <a href="../index.html" class="hub-btn hub-btn-secondary" style="text-decoration:none;">
+        ← Back to Hub Menu
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Victory Screen -->
+<div id="picoWinMenu" class="pico-overlay" style="display:none;">
+  <div class="pico-card">
+    <div id="pico-win-icon" class="pico-star-icon"></div>
+    <h2 class="pico-title" style="color:#ffd54f;">YOU ALL WIN!</h2>
+    <p class="pico-sub">All levels completed with 4-player synchronization!</p>
+    <div class="pico-btn-group">
+      <button id="picoPlayAgainBtn" type="button" class="hub-btn hub-btn-primary">
+        Play Again
+      </button>
+      <a href="../index.html" class="hub-btn hub-btn-secondary" style="text-decoration:none;">
+        ← Back to Hub Menu
+      </a>
+    </div>
+  </div>
+</div>
+
 <canvas id="c" width="960" height="540"></canvas>
 <script src="hub-nav.js"></script>
 <script>
@@ -162,7 +380,13 @@ function update() {
     const goal = rect(level.goal);
     if (players.every(p => hit(p, goal))) { state = 'clear'; timer = 100; }  // ALL 4 inside the door
   } else if (--timer <= 0) {
-    if (levelIdx + 1 < LEVELS.length) loadLevel(levelIdx + 1); else state = 'win';
+    if (levelIdx + 1 < LEVELS.length) {
+      loadLevel(levelIdx + 1);
+    } else {
+      state = 'win';
+      const winMenu = document.getElementById('picoWinMenu');
+      if (winMenu) winMenu.style.display = 'flex';
+    }
   }
 }
 
@@ -215,21 +439,86 @@ function draw() {
   }
 }
 
+/* ---------- MENU & HUB INTEGRATION ---------- */
+let gameStarted = false;
 let isPaused = false;
+
+const startMenu = document.getElementById('picoStartMenu');
+const winMenu = document.getElementById('picoWinMenu');
+const startBtn = document.getElementById('picoStartBtn');
+const playAgainBtn = document.getElementById('picoPlayAgainBtn');
+const menuBtn = document.getElementById('picoMenuBtn');
+
+function startGame() {
+  if (gameStarted) return;
+  gameStarted = true;
+  if (startMenu) startMenu.style.display = 'none';
+}
+
+if (startBtn) startBtn.addEventListener('click', startGame);
+
+if (playAgainBtn) {
+  playAgainBtn.addEventListener('click', () => {
+    if (winMenu) winMenu.style.display = 'none';
+    state = 'play';
+    loadLevel(0);
+  });
+}
+
 const hubNav = window.HubNav ? HubNav.init({
   gameId: 'pico',
+  customPauseHandling: true,
   onPause: () => { isPaused = true; },
   onResume: () => { isPaused = false; }
 }) : null;
 
+if (menuBtn) {
+  menuBtn.addEventListener('click', () => {
+    if (!gameStarted) return;
+    if (hubNav) hubNav.togglePause();
+  });
+}
+
+// Populate start & win static star icons with Stack Park gradient
+if (window.HubNav) {
+  const stops = HubNav.GAME_CONFIGS.pico.stops;
+  const startIcon = document.getElementById('pico-star-icon');
+  const winIcon = document.getElementById('pico-win-icon');
+  if (startIcon) startIcon.innerHTML = HubNav.createStarSvg('picoStartGrad', stops, 'hub-hero-star');
+  if (winIcon) winIcon.innerHTML = HubNav.createStarSvg('picoWinGrad', stops, 'hub-hero-star');
+
+  // Insert Restart Level button into pause overlay
+  const pauseGroup = document.querySelector('#hubPauseOverlay .hub-btn-group');
+  if (pauseGroup && !document.getElementById('picoPauseRestartBtn')) {
+    const rBtn = document.createElement('button');
+    rBtn.id = 'picoPauseRestartBtn';
+    rBtn.type = 'button';
+    rBtn.className = 'hub-btn hub-btn-secondary';
+    rBtn.textContent = 'Restart Level (R)';
+    rBtn.addEventListener('click', () => {
+      loadLevel(levelIdx);
+      if (hubNav) hubNav.resume();
+    });
+    pauseGroup.insertBefore(rBtn, document.getElementById('hubExitToMenuBtn'));
+  }
+}
+
 /* ---------- INPUT & MAIN LOOP ---------- */
 addEventListener('keydown', e => {
+  if (!gameStarted) {
+    if (e.code === 'Enter' || e.code === 'Space') {
+      e.preventDefault();
+      startGame();
+    }
+    return;
+  }
+
   if (e.code === 'Escape' || e.code === 'KeyP') {
     e.preventDefault();
     if (hubNav) hubNav.togglePause();
     return;
   }
-  if (e.code === 'KeyM' && state === 'win') {
+  if (e.code === 'KeyM' && (isPaused || state === 'win')) {
     window.location.href = '../index.html';
     return;
   }
@@ -237,7 +526,11 @@ addEventListener('keydown', e => {
   if (!e.repeat) {
     players.forEach(p => { if (e.code === p.ctl.up) p.jumpBuf = 8; });
     if (e.code === 'KeyR') loadLevel(levelIdx);
-    if (e.code === 'Enter' && state === 'win') loadLevel(0);
+    if (e.code === 'Enter' && state === 'win') {
+      if (winMenu) winMenu.style.display = 'none';
+      state = 'play';
+      loadLevel(0);
+    }
   }
   keys[e.code] = true;   // every held key is tracked independently -> 4 players at once
 });
@@ -248,7 +541,7 @@ loadLevel(0);
 let last = performance.now(), acc = 0;
 function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.1); last = now;   // fixed 60Hz physics step
-  if (!isPaused) {
+  if (!isPaused && gameStarted) {
     acc += dt;
     while (acc >= 1 / 60) { update(); acc -= 1 / 60; }
   }

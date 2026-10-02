@@ -1,8 +1,8 @@
 /**
- * YOU GOT GAMES — Universal In-Game Navigation & Pause Overlay Helper
+ * YOU GOT GAMES? — Universal In-Game Navigation & Pause Overlay Helper
  * Renders the custom icon.svg with game-specific color gradients and handles:
  * - Floating Back-to-Menu button
- * - Pause overlay featuring the gradient hero icon + spread-out background star icons
+ * - Pause overlay featuring one main static gradient icon
  * - Keyboard listeners and state toggles
  */
 
@@ -138,10 +138,10 @@
       this.customPauseHandling = options.customPauseHandling || false;
 
       this.initTheme();
-      this.injectBackButton();
       if (!options.disablePauseOverlay) {
         this.injectPauseOverlay();
       }
+      this.injectBackButton();
       this.bindKeyboard();
     }
 
@@ -162,6 +162,27 @@
       rootEl.style.setProperty('--hub-glow', this.config.glow);
       rootEl.style.setProperty('--hub-c1', this.config.c1);
       rootEl.style.setProperty('--hub-c2', this.config.c2);
+    }
+
+    hasReturnToHubButton() {
+      // Check if pause overlay or game already contains a button/link back to hub
+      if (document.getElementById('hubExitToMenuBtn')) return true;
+      if (document.getElementById('poolBackBtn')) return true;
+
+      const hubLinks = Array.from(document.querySelectorAll('a[href*="index.html"]'))
+        .filter(el => el.id !== 'hubBackBtn');
+      if (hubLinks.length > 0) return true;
+
+      const clickableElements = Array.from(document.querySelectorAll('button, a'))
+        .filter(el => el.id !== 'hubBackBtn');
+      for (const el of clickableElements) {
+        const text = (el.textContent || '').trim().toLowerCase();
+        if (text === 'hub menu' || text === 'back to hub' || text === 'return to hub' || text === 'exit to hub') {
+          return true;
+        }
+      }
+
+      return false;
     }
 
     injectBackButton() {
@@ -196,21 +217,12 @@
       overlay.id = 'hubPauseOverlay';
       overlay.className = 'hub-pause-overlay';
 
-      // Spread-out background stars using icon.svg with reduced opacity
-      const spreadStarsHtml = Array.from({ length: 8 }, (_, i) => {
-        const gradId = `spreadStarGrad_${this.gameId}_${i}`;
-        const star = createStarSvg(gradId, this.config.stops);
-        return `<div class="hub-spread-star">${star}</div>`;
-      }).join('');
-
-      // Hero Center Star Icon
+      // One main static star icon
       const heroStarHtml = createStarSvg(`heroStarGrad_${this.gameId}`, this.config.stops, 'hub-hero-star');
 
       overlay.innerHTML = `
-        <div class="hub-spread-stars">${spreadStarsHtml}</div>
         <div class="hub-pause-card">
           <div class="hub-hero-star-wrapper">
-            <div class="hub-hero-star-glow"></div>
             ${heroStarHtml}
           </div>
           <h2 class="hub-pause-title">Game Paused</h2>
@@ -262,6 +274,17 @@
       this.isPaused = true;
       const overlay = document.getElementById('hubPauseOverlay');
       if (overlay) overlay.classList.add('active');
+
+      const backBtn = document.getElementById('hubBackBtn');
+      if (backBtn) {
+        // Only show left-top button if the game does NOT already have a return to hub button
+        if (!this.hasReturnToHubButton()) {
+          backBtn.classList.add('active-pause');
+        } else {
+          backBtn.classList.remove('active-pause');
+        }
+      }
+
       if (typeof this.onPause === 'function') {
         this.onPause();
       }
@@ -272,6 +295,12 @@
       this.isPaused = false;
       const overlay = document.getElementById('hubPauseOverlay');
       if (overlay) overlay.classList.remove('active');
+
+      const backBtn = document.getElementById('hubBackBtn');
+      if (backBtn) {
+        backBtn.classList.remove('active-pause');
+      }
+
       if (typeof this.onResume === 'function') {
         this.onResume();
       }

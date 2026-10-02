@@ -11,7 +11,7 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georg
 #box{position:relative;width:min(100vw,177.78vh);height:min(56.25vw,100vh);overflow:hidden;background:#000}
 #st,#vg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #st{image-rendering:pixelated;mix-blend-mode:screen;opacity:0}
-#vg{background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.85) 100%)}
+#vg{background:radial-gradient(ellipse at center,transparent 56%,rgba(0,0,0,.68) 100%)}
 #pc{position:absolute;left:3%;top:4%;font-size:clamp(14px,1.8vw,26px);letter-spacing:.12em;opacity:.4;transition:opacity 1.5s}
 #hint{position:absolute;left:0;right:0;bottom:12%;text-align:center;opacity:0;letter-spacing:.3em;font-size:clamp(12px,1.4vw,20px);transition:opacity .2s}
 #msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.82);cursor:pointer;text-align:center;letter-spacing:.15em}
@@ -39,15 +39,28 @@ const keys={};
 /* ---------- renderer / scene / camera / flashlight ---------- */
 const renderer=new R.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
-renderer.setClearColor(0x000000);
+renderer.setClearColor(0x020408);
 renderer.domElement.style.cssText='display:block;width:100%;height:100%';
 box.prepend(renderer.domElement);
 const scene=new R.Scene();
-scene.fog=new R.FogExp2(0x000000,.085);
-const cam=new R.PerspectiveCamera(65,16/9,.1,80);
+scene.fog=new R.FogExp2(0x020408,.033);
+const cam=new R.PerspectiveCamera(65,16/9,.1,90);
 cam.rotation.order='YXZ';cam.position.set(0,1.7,0);scene.add(cam);
-const spot=new R.SpotLight(0xfff0d0,3.2,24,.3,.6,1);
-spot.position.set(.15,-.1,0);cam.add(spot);cam.add(spot.target);spot.target.position.set(0,0,-5);
+
+// Main heavy-duty flashlight beam: focused 33-degree cone, 46-meter reach
+const spot=new R.SpotLight(0xfff3df,3.4,46,0.58,0.5,1.0);
+spot.position.set(.12,-.08,0);cam.add(spot);cam.add(spot.target);spot.target.position.set(0,0,-8);
+
+// Wide spill / fill light: subtle fill on surrounding trees
+const spillLight=new R.SpotLight(0xd0e0f8,0.7,24,0.95,0.7,1.4);
+spillLight.position.set(0,0,0);cam.add(spillLight);cam.add(spillLight.target);spillLight.target.position.set(0,0,-8);
+
+// Nocturnal ambient moonlight: subtle silhouette depth without washing out darkness
+const ambient=new R.AmbientLight(0x142030,0.22);scene.add(ambient);
+
+// Personal close-range lantern aura
+const lantern=new R.PointLight(0xffeedd,0.35,7,1.8);lantern.position.set(0,0.1,0);cam.add(lantern);
+
 function resize(){const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();
 
@@ -55,11 +68,11 @@ addEventListener('resize',resize);resize();
 function tex(w,h,fn,rx,ry){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);
   const T=new R.CanvasTexture(c);T.wrapS=T.wrapT=R.RepeatWrapping;T.repeat.set(rx,ry);return T}
 const gT=tex(256,256,(x,w,h)=>{const im=x.createImageData(w,h),d=im.data;
-  for(let i=0;i<d.length;i+=4){const v=14+Math.random()*46;d[i]=v*.8;d[i+1]=v;d[i+2]=v*.65;d[i+3]=255}
+  for(let i=0;i<d.length;i+=4){const v=20+Math.random()*36;d[i]=v*.82;d[i+1]=v;d[i+2]=v*.68;d[i+3]=255}
   x.putImageData(im,0,0);
-  for(let i=0;i<260;i++){x.fillStyle=Math.random()<.5?'rgba(0,0,0,.18)':'rgba(70,80,50,.1)';x.beginPath();x.arc(rnd(0,w),rnd(0,h),rnd(2,14),0,7);x.fill()}},48,48);
-const bT=tex(64,256,(x,w,h)=>{x.fillStyle='#2a2119';x.fillRect(0,0,w,h);
-  for(let i=0;i<90;i++){x.fillStyle=Math.random()<.6?'rgba(0,0,0,.35)':'rgba(120,100,80,.18)';x.fillRect(rnd(0,w),0,rnd(1,4),h*rnd(.3,1))}
+  for(let i=0;i<260;i++){x.fillStyle=Math.random()<.5?'rgba(10,15,8,.22)':'rgba(60,75,50,.18)';x.beginPath();x.arc(rnd(0,w),rnd(0,h),rnd(2,14),0,7);x.fill()}},48,48);
+const bT=tex(64,256,(x,w,h)=>{x.fillStyle='#2c221a';x.fillRect(0,0,w,h);
+  for(let i=0;i<90;i++){x.fillStyle=Math.random()<.6?'rgba(12,8,6,.35)':'rgba(120,95,75,.22)';x.fillRect(rnd(0,w),0,rnd(1,4),h*rnd(.3,1))}
   for(let i=0;i<500;i++){x.fillStyle='rgba(0,0,0,.2)';x.fillRect(rnd(0,w),rnd(0,h),2,2)}},2,4);
 const hT=tex(64,64,x=>{const g=x.createRadialGradient(32,32,0,32,32,32);
   g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64)},1,1);
@@ -96,26 +109,85 @@ picked.forEach(q=>{
   halo.position.z=.02;g.add(paper,halo);scene.add(g);pgs.push({g,paper,halo});
 });
 
-/* ---------- the Entity ---------- */
-const mB=new R.MeshBasicMaterial({color:0x0c0c0c}),mW=new R.MeshBasicMaterial({color:0xffffff}),ent=new R.Group();
+/* ---------- the Entity (Slenderman) ---------- */
+const mSuit=new R.MeshStandardMaterial({color:0x111317,roughness:0.8,metalness:0.1});
+const mW=new R.MeshBasicMaterial({color:0xffffff});
+const mTie=new R.MeshBasicMaterial({color:0x8b0000});
+const ent=new R.Group();
+
 function bx(w,h,l,m,x,y,z,p){const o=new R.Mesh(new R.BoxGeometry(w,h,l),m);o.position.set(x,y,z);(p||ent).add(o);return o}
-bx(.2,1.7,.2,mB,-.15,.85,0);bx(.2,1.7,.2,mB,.15,.85,0);       // legs
-bx(.56,1.5,.32,mB,0,2.45,0);bx(.12,1.3,.02,mW,0,2.5,.17);      // torso + white shirt strip
-const head=bx(.3,.55,.3,mW,0,3.5,0);                             // faceless head
-function arm(sx,len,th,rz,rx,y){const g=new R.Group();g.position.set(sx*.3,y,0);
-  bx(th,len,th,mB,0,-len/2,0,g);bx(th*1.5,.5,th*1.5,mW,0,-len-.2,0,g);g.rotation.z=sx*rz;g.rotation.x=rx;ent.add(g)}
-arm(-1,2.7,.11,.1,.05,3.1);arm(1,2.7,.11,.1,-.05,3.1);          // impossibly long arms
-arm(-1,2.2,.06,.7,.4,3.0);arm(1,2.2,.06,.7,.4,3.0);             // extra thin back limbs
+
+// Slender legs (2.0m tall, lean)
+bx(.2,2.0,.2,mSuit,-.18,1.0,0);
+bx(.2,2.0,.2,mSuit,.18,1.0,0);
+
+// Torso (dark tailored suit)
+bx(.64,1.6,.34,mSuit,0,2.75,0);
+
+// White dress shirt & collar
+bx(.18,1.35,.04,mW,0,2.82,.18);
+bx(.26,.18,.06,mW,0,3.42,.17);
+
+// Blood red tie
+bx(.07,1.0,.05,mTie,0,2.85,.21);
+
+// Towering faceless head with eerie halo glow that cuts through fog
+const head=new R.Group();head.position.set(0,3.85,0);
+const headGeo=new R.SphereGeometry(.26,16,16);headGeo.scale(.85,1.35,.95);
+const headMesh=new R.Mesh(headGeo,mW);head.add(headMesh);
+
+const headGlow=new R.Mesh(new R.PlaneGeometry(1.8,1.8),new R.MeshBasicMaterial({
+  map:hT,transparent:true,opacity:0.5,blending:R.AdditiveBlending,depthWrite:false,fog:false
+}));
+headGlow.position.set(0,0,.05);head.add(headGlow);
+ent.add(head);
+
+// Long hanging arms with pale hands
+function arm(sx,len,th,rz,rx,y){const g=new R.Group();g.position.set(sx*.34,y,0);
+  bx(th,len,th,mSuit,0,-len/2,0,g);
+  bx(th*1.6,.45,th*1.6,mW,0,-len-.2,0,g);
+  g.rotation.z=sx*rz;g.rotation.x=rx;ent.add(g)}
+arm(-1,2.7,.12,.08,.05,3.3);
+arm(1,2.7,.12,.08,-.05,3.3);
+
+// Writhing black tendrils on his back (animated in loop)
+const tendrils=[];
+for(let i=0;i<4;i++){
+  const tg=new R.Group(),side=(i%2===0?-1:1),yPos=3.2-(i>1?.4:0);
+  tg.position.set(side*.24,yPos,-.16);
+  const tenLen=2.8+(i*.35);
+  const tenMesh=bx(.08,tenLen,.08,mSuit,0,tenLen/2,0,tg);
+  tenMesh.rotation.z=side*.38;tenMesh.rotation.x=-.38-(i*.16);
+  ent.add(tg);
+  tendrils.push({group:tg,side,speed:1.6+i*.35,phase:i*1.4});
+}
 scene.add(ent);
 
-function place(d){const a=yaw+Math.PI+rnd(-1.2,1.2);
-  ent.position.set(clamp(cam.position.x-Math.sin(a)*d,-58,58),0,clamp(cam.position.z-Math.cos(a)*d,-58,58))}
-const eSpeed=()=>1.2+.8*got;
-function diff(){scene.fog.density=.085+.014*got;spot.distance=24-1.6*got}
-place(30);diff();
+let graceTimer = 0;
+function place(d, angleOffset) {
+  const a = yaw + (angleOffset !== undefined ? angleOffset : rnd(-0.85, 0.85));
+  let ex = clamp(cam.position.x - Math.sin(a)*d, -52, 52);
+  let ez = clamp(cam.position.z - Math.cos(a)*d, -52, 52);
+  for (const q of trees) {
+    const dx = ex - q.x, dz = ez - q.z, distTree = Math.hypot(dx, dz);
+    if (distTree < q.r + 0.6) {
+      ex = q.x + (dx / (distTree || 1)) * (q.r + 0.8);
+      ez = q.z + (dz / (distTree || 1)) * (q.r + 0.8);
+    }
+  }
+  ent.position.set(ex, 0, ez);
+  ent.rotation.y = Math.atan2(cam.position.x - ent.position.x, cam.position.z - ent.position.z);
+}
+
+function diff() {
+  scene.fog.density = 0.033 + 0.004 * got;
+  spot.distance = 46 - 1.2 * got;
+  spillLight.distance = 24 - 0.8 * got;
+}
+place(36, rnd(-0.5, 0.5)); diff();
 
 /* ---------- procedural audio ---------- */
-let AC,droneG,noiseG;
+let AC,droneG,noiseG,lastSting=0;
 function audio(){if(AC){AC.resume();return}
   try{AC=new(window.AudioContext||window.webkitAudioContext)();
     droneG=AC.createGain();droneG.gain.value=.05;droneG.connect(AC.destination);
@@ -123,6 +195,26 @@ function audio(){if(AC){AC.resume();return}
     const b=AC.createBuffer(1,AC.sampleRate,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
     const n=AC.createBufferSource(),g=AC.createGain();n.buffer=b;n.loop=true;g.gain.value=0;n.connect(g);g.connect(AC.destination);n.start();noiseG=g;
   }catch(e){}}
+
+function stingSound(){
+  if(!AC||AC.state!=='running')return;
+  const now=AC.currentTime;
+  if(now-lastSting<5.0)return;
+  lastSting=now;
+  try{
+    const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();
+    o.type='sawtooth';o.frequency.setValueAtTime(150,now);o.frequency.exponentialRampToValueAtTime(45,now+.9);
+    f.type='lowpass';f.frequency.setValueAtTime(550,now);
+    g.gain.setValueAtTime(.28,now);g.gain.exponentialRampToValueAtTime(.001,now+1.1);
+    o.connect(f);f.connect(g);g.connect(AC.destination);o.start(now);o.stop(now+1.1);
+    [587,622,880].forEach(freq=>{
+      const osc=AC.createOscillator(),gn=AC.createGain();
+      osc.type='triangle';osc.frequency.setValueAtTime(freq,now);
+      gn.gain.setValueAtTime(.09,now);gn.gain.exponentialRampToValueAtTime(.0001,now+.85);
+      osc.connect(gn);gn.connect(AC.destination);osc.start(now);osc.stop(now+.85);
+    });
+  }catch(_){}
+}
 
 /* ---------- UI / state helpers ---------- */
 const sc=$('st'),sx=sc.getContext('2d'),sd=sx.createImageData(96,54);
@@ -138,15 +230,11 @@ const slenderStops = (window.HubNav && HubNav.GAME_CONFIGS.slender) ? HubNav.GAM
 ];
 
 const starSvg = () => window.HubNav ? HubNav.createStarSvg('slenderGrad', slenderStops, 'hub-hero-star') : '';
-const spreadStars = () => window.HubNav ? Array.from({length:6}, (_,i) =>
-  `<div class="hub-spread-star">${HubNav.createStarSvg('slenderSpread_'+i, slenderStops)}</div>`
-).join('') : '';
 
 const show = (title, sub) => {
   $('msg').innerHTML = `
-    <div class="hub-spread-stars">${spreadStars()}</div>
     <div style="position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; max-width:440px; padding:20px;">
-      <div style="width:78px; height:78px; margin-bottom:12px; filter:drop-shadow(0 0 16px rgba(255,240,208,0.5));">${starSvg()}</div>
+      <div style="width:78px; height:78px; margin-bottom:12px;">${starSvg()}</div>
       <b>${title}</b>
       <i>${sub}</i>
       <a href="../index.html" class="hub-btn hub-btn-secondary" style="margin-top:16px; text-decoration:none; padding:8px 22px; font-size:13px; z-index:10;">← Back to Hub</a>
@@ -164,7 +252,11 @@ function die(){if(state!=='play')return;state='dead';document.exitPointerLock();
 function take(p){scene.remove(p.g);pgs.splice(pgs.indexOf(p),1);got++;
   $('pc').textContent=`Pages: ${got} / ${TOTAL}`;$('pc').style.opacity=1;setTimeout(()=>$('pc').style.opacity=.4,1800);
   if(got>=TOTAL){state='won';document.exitPointerLock();$('hint').style.opacity=0;show('YOU MADE IT OUT', 'Click to play again');return}
-  diff();place(Math.max(9,22-got*1.6));unseen=0}
+  diff();
+  graceTimer = Math.max(3.5, 7.5 - got * 0.5);
+  const standDist = Math.max(16, 36 - got * 2.4);
+  place(standDist, rnd(-1.1, 1.1));
+  unseen = 0;}
 
 /* ---------- input (native Pointer Lock API) ---------- */
 $('msg').addEventListener('click', e => {
@@ -186,7 +278,7 @@ function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(clk.getDelta(),.05);t+=dt;
   const p=cam.position,sh=()=>(Math.random()-.5)*distort*.03;
-  let dist=99,look=0,noise=0;
+  let dist=99,look=0,noise=0,dot=0;
   cam.rotation.set(pitch+sh(),yaw+sh(),0);
 
   if(state==='play'){
@@ -199,44 +291,118 @@ function loop(){
     p.y=1.7+((f||s)?Math.sin(t*(run?11:7.5))*.035:0);
 
     // Entity: dot product of camera direction and direction-to-entity
-    toE.set(ent.position.x-p.x,2.4-p.y,ent.position.z-p.z);dist=toE.length();toE.normalize();
-    cam.getWorldDirection(fwd);const dot=fwd.dot(toE);
-    const seen=dot>.6&&dist<45,staring=dot>.9&&dist<22;
-    if(!seen){                                  // off-screen: glide + periodic lunge
-      unseen+=dt;
-      const dx=p.x-ent.position.x,dz=p.z-ent.position.z,d=Math.hypot(dx,dz)||1;
-      let step=eSpeed()*dt;
-      if(unseen>Math.max(2.5,7-.55*got)){step+=2.5+.35*got;unseen=0}
-      ent.position.x+=dx/d*step;ent.position.z+=dz/d*step;
-      if(dist>40)place(26);
+    toE.set(ent.position.x-p.x,3.2-p.y,ent.position.z-p.z);dist=toE.length();toE.normalize();
+    cam.getWorldDirection(fwd);dot=fwd.dot(toE);
+
+    // Seen: in player's field of view (dot > 0.50) and within visible distance
+    const seen=dot>.50&&dist<52;
+    const lookingDirect=dot>.82&&dist<36;
+
+    if(graceTimer>0)graceTimer-=dt;
+
+    if(seen&&dot>.75)stingSound();
+
+    if(got>0&&graceTimer<=0){
+      if(!seen){
+        // While player is NOT looking: Slender stalks via timed relocations in front/flank
+        unseen+=dt;
+        const stalkInterval=Math.max(5.5,12.5-got*1.0);
+        if(unseen>stalkInterval){
+          unseen=0;
+          const targetDist=Math.max(14,34-got*2.2);
+          place(targetDist,rnd(-1.2,1.2));
+        }else if(dist>54){
+          // If player ran far away, relocate into stalking range
+          place(Math.max(20,36-got*2.0),rnd(-1.1,1.1));
+        }
+      }else{
+        // Looking at him FREEZES him! Classic Slender rule.
+        unseen=0;
+      }
+    }else if(got===0){
+      // Before Page 1: Slenderman is visible in the distance watching the player
+      if(!seen){
+        unseen+=dt;
+        if(unseen>14){
+          unseen=0;
+          place(rnd(30,40),rnd(-0.85,0.85));
+        }
+      }else{
+        unseen=0;
+      }
+      if(dist<14){
+        place(rnd(32,42),rnd(-0.85,0.85));
+      }
     }
+
     ent.rotation.y=Math.atan2(p.x-ent.position.x,p.z-ent.position.z);
-    if(staring){sanity-=dt*.1*(1+.12*got);look=1}else sanity=Math.min(1,sanity+dt*.02);
-    head.rotation.z=look?rnd(-.4,.4):0;
-    if(sanity<=0||Math.hypot(ent.position.x-p.x,ent.position.z-p.z)<1.4)die();
 
-    // dying flashlight: flicker grows with progress, low sanity and proximity
-    fl-=dt;if(fl<=0){fl=rnd(.05,.4);flk=Math.random()<.04+.02*got+(1-sanity)*.2+(dist<8?.15:0)?rnd(.05,.5):1}
-    spot.intensity=(3.2-.12*got)*flk;
+    // Dynamic tendril animation
+    tendrils.forEach(ten=>{
+      ten.group.rotation.z=Math.sin(t*ten.speed+ten.phase)*0.18*ten.side;
+      ten.group.rotation.x=Math.cos(t*ten.speed*0.8+ten.phase)*0.22;
+    });
 
-    // page detection
+    // Face the head glow halo towards camera
+    headGlow.quaternion.copy(cam.quaternion);
+
+    // Fair sanity and stare tension
+    if(lookingDirect&&got>0){
+      const drainMult=dist<8?0.32:(dist<18?0.15:0.05);
+      sanity-=dt*drainMult*(1+0.1*got);
+      look=Math.min(1,(36-dist)/24);
+    }else if(seen&&got>0){
+      look=Math.max(look,0.22);
+      sanity-=dt*0.02;
+    }else if(seen&&got===0){
+      look=Math.max(look,0.18);
+      sanity=Math.min(1,sanity+dt*0.04);
+    }else{
+      // Faster recovery when looking away
+      sanity=Math.min(1,sanity+dt*0.08);
+    }
+
+    head.rotation.z=(look>0.3)?(Math.sin(t*8)*0.15):0;
+    if(got>0&&(sanity<=0||(dist<1.6&&lookingDirect)))die();
+
+    // Natural flashlight flicker: atmospheric, no disco seizure
+    fl-=dt;
+    if(fl<=0){
+      fl=rnd(0.2,0.8);
+      const isFlickering=(look>0.4&&Math.random()<0.35)||(sanity<0.3&&Math.random()<0.25);
+      flk=isFlickering?rnd(0.65,0.9):1;
+    }
+    const baseBright=3.4-0.08*got;
+    spot.intensity=baseBright*flk;
+    spillLight.intensity=(0.7-0.03*got)*flk;
+    lantern.intensity=0.35*flk;
+
+    // page detection (expanded raycast distance)
     ray.setFromCamera({x:0,y:0},cam);
+    ray.far=4.2;
     const hit=ray.intersectObjects(pgs.map(q=>q.paper));
     aim=hit.length?pgs.find(q=>q.paper===hit[0].object):null;
-    $('hint').style.opacity=aim?0.7:0;
+    $('hint').style.opacity=aim?0.85:0;
   }else if(state==='dead'){look=1;noise=1}
 
   pgs.forEach(q=>q.halo.material.opacity=.16+.07*Math.sin(t*3+q.g.position.x));
 
-  // screen distortion + static
-  distort+=(look-distort)*Math.min(1,dt*8);
+  // screen distortion + static (atmospheric, no rainbow strobe invert)
+  distort+=(look-distort)*Math.min(1,dt*6);
   const ins=1-sanity;
-  noise=Math.max(noise,distort*.55,ins*.35,dist<12?(12-dist)/12*.4:0);
-  if(distort>.02||ins>.05){
-    box.style.filter=`invert(${(distort*(Math.sin(t*40)>0?.95:.05)).toFixed(2)}) blur(${(distort*Math.random()*3+ins*1.5).toFixed(1)}px) contrast(${(1+distort*(1+Math.sin(t*25))+ins*.5).toFixed(2)}) hue-rotate(${(distort*Math.random()*80)|0}deg)`;filtOn=true;
+  // Natural proximity static cue when facing in his direction even before direct line of sight
+  const dirStatic=(dot>0.35&&dist<36)?(36-dist)/36*0.25:0;
+  noise=Math.max(distort*0.7,ins*0.5,dirStatic,dist<14?(14-dist)/14*0.45:0);
+
+  if(distort>0.04||ins>0.08){
+    const contrastVal=(1+distort*0.4+ins*0.2).toFixed(2);
+    const brightVal=Math.max(0.65, 1-ins*0.2).toFixed(2);
+    const blurVal=(distort*1.0).toFixed(1);
+    box.style.filter=`contrast(${contrastVal}) brightness(${brightVal}) blur(${blurVal}px)`;
+    filtOn=true;
   }else if(filtOn){box.style.filter='none';filtOn=false}
-  stat(noise*.6);
-  if(noiseG){droneG.gain.value=.05+.01*got+(dist<15?(15-dist)*.004:0);noiseG.gain.value=noise*.22}
+  stat(noise*0.65);
+  if(noiseG){droneG.gain.value=.05+.01*got+(dist<30?(30-dist)*.004:0);noiseG.gain.value=noise*.22}
 
   renderer.render(scene,cam);
 }

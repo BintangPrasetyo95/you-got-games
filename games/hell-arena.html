@@ -173,9 +173,8 @@
 </div>
 
 <div id="overlay" data-mode="menu">
-  <div class="hub-spread-stars" id="hellSpreadStars"></div>
   <section id="menuPanel" class="card" style="position:relative; z-index:2;">
-    <div id="hell-idle-icon" style="width: 86px; height: 86px; margin: 0 auto 12px; filter: drop-shadow(0 0 20px rgba(229, 39, 26, 0.75));"></div>
+    <div id="hell-idle-icon" style="width: 86px; height: 86px; margin: 0 auto 12px;"></div>
     <h1 class="title">HELL<br>ARENA</h1>
     <p class="lede">The gates are open and the horde is coming for you. Hold the arena with your shotgun for as long as you can.</p>
     <div class="controls">
@@ -194,7 +193,7 @@
   </section>
 
   <section id="pausePanel" class="card" style="position:relative; z-index:2;">
-    <div id="hell-pause-icon" style="width: 90px; height: 90px; margin: 0 auto 14px; filter: drop-shadow(0 0 24px rgba(229, 39, 26, 0.85));"></div>
+    <div id="hell-pause-icon" style="width: 90px; height: 90px; margin: 0 auto 14px;"></div>
     <h1 class="title small">PAUSED</h1>
     <p class="lede">The horde will wait. Click resume to capture the mouse and get back in.</p>
     <p class="note" id="pauseNote"></p>
@@ -1316,9 +1315,6 @@ if (window.HubNav) {
   const hellStops = HubNav.GAME_CONFIGS['hell-arena'].stops;
   $('hell-idle-icon').innerHTML = HubNav.createStarSvg('hellIdleGrad', hellStops, 'hub-hero-star');
   $('hell-pause-icon').innerHTML = HubNav.createStarSvg('hellPauseGrad', hellStops, 'hub-hero-star');
-  $('hellSpreadStars').innerHTML = Array.from({ length: 8 }, (_, i) =>
-    `<div class="hub-spread-star">${HubNav.createStarSvg('hellSpreadGrad_' + i, hellStops)}</div>`
-  ).join('');
 }
 
 requestAnimationFrame(frame);

@@ -14,7 +14,6 @@ canvas{display:block}
 @keyframes hit{0%{filter:none}12%{filter:invert(1) contrast(4) blur(2px);transform:scale(1.25) skewX(12deg)}30%{filter:hue-rotate(160deg) saturate(6) blur(6px);transform:scale(1.1) skewY(-8deg)}45%,75%{filter:brightness(0);transform:scale(1.4)}100%{filter:none;transform:none}}
 </style></head><body>
 <div id="ov">
-  <div class="hub-spread-stars" id="poolSpreadStars"></div>
   <div id="pool-star-icon" style="width: 86px; height: 86px; margin-bottom: 8px; position:relative; z-index:2;"></div>
   <h1 style="position:relative; z-index:2;">THE POOLROOMS</h1>
   <p style="position:relative; z-index:2;">Level 37. You are not alone.</p>
@@ -44,9 +43,10 @@ const CFG={
  godray:0.6,       // godray intensity (0 = off)
  sunTilt:0.5,      // slant of the light shafts
  viewChunks:2,     // load radius in chunks (2 => 5x5 chunks of 32 m)
- anomalies:2,      // [SPAWN RATE] max simultaneous anomalies (was 3); one more joins every rampSecs
- anomalySpeed:2.0, // m/s (player walks 2.6, sprints ~3.8)
- rampSecs:120, spawnMin:24, spawnMax:32, despawn:50, catchDist:0.9,
+ anomalies:1,      // [SPAWN RATE] lowered to 1 max anomaly for rare, atmospheric encounters
+ anomalySpeed:1.55,// m/s (player walks 2.6, sprints ~3.8; now escapable)
+ rampSecs:240, spawnMin:36, spawnMax:48, despawn:55, catchDist:0.9,
+ spawnChance:0.3, cooldownSecs:75,
  bobAmp:0.035,     // head-bob height (m)
  stepLen:0.95,     // metres per footstep (bob + splash cycle)
  breathAmp:0.012,  // idle breathing sway
@@ -234,7 +234,7 @@ for(let i=0;i<CFG.anomalies;i++){ // dark, featureless, long-armed figures
  const g=new THREE.Group(),m=(geo,y)=>{const o=new THREE.Mesh(geo,anMat);o.position.y=y;g.add(o);return o};
  m(AG.leg,.6);m(AG.tor,1.7);const hd=m(AG.head,2.45);hd.scale.y=1.35;
  const arms=[-1,1].map(s=>{const p=new THREE.Group();p.position.set(s*.34,2.15,0);p.add(new THREE.Mesh(AG.arm,anMat));g.add(p);return p});
- g.visible=false;scene.add(g);ans.push({g,hd,arms,on:false,ph:Math.random()*9,y:0})}
+ g.visible=false;scene.add(g);ans.push({g,hd,arms,on:false,ph:Math.random()*9,y:0,nextSpawn:75+Math.random()*60})}
 function respawn(a){ // always behind the player (>=120 deg from view direction, so outside the FOV)
  const ang=yaw+(Math.random()-.5)*2,d=CFG.spawnMin+Math.random()*(CFG.spawnMax-CFG.spawnMin);
  a.g.position.set(P.x+Math.sin(ang)*d,0,P.z+Math.cos(ang)*d);a.y=Math.max(CFG.anomalyFloor,floorH(Math.floor(a.g.position.x/C),Math.floor(a.g.position.z/C)))}
@@ -430,7 +430,7 @@ function teleport(){ // random open cell far away
  P.x=(x+.5)*C;P.z=(z+.5)*C;vx=vz=0;yaw=Math.random()*6.28;eyeY=floorH(x,z)+CFG.eyeHeight;updateChunks(P.x,P.z,999)}
 function caught(){
  if(hitCool>0)return;hitCool=2;catches++;cv.classList.remove('hit');void cv.offsetWidth;cv.classList.add('hit');sndHit();
- setTimeout(()=>{teleport();ans.forEach(a=>a.on&&respawn(a))},500)} // reset while the screen is blacked out
+ setTimeout(()=>{teleport();ans.forEach(a=>{a.on=a.g.visible=false;a.nextSpawn=T+CFG.cooldownSecs+Math.random()*60})},500)} // reset while the screen is blacked out
 addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('mousedown',()=>drag=true);addEventListener('mouseup',()=>drag=false);
 addEventListener('mousemove',e=>{if(!started||paused||!(locked||(fallback&&drag)))return;yaw-=e.movementX*CFG.mouseSens;pitch=Math.max(-1.45,Math.min(1.45,pitch-e.movementY*CFG.mouseSens))});
@@ -439,9 +439,6 @@ if(window.HubNav){
   HubNav.init({gameId:'poolrooms',disablePauseOverlay:true});
   const stops=HubNav.GAME_CONFIGS.poolrooms.stops;
   document.getElementById('pool-star-icon').innerHTML=HubNav.createStarSvg('poolGrad',stops,'hub-hero-star');
-  document.getElementById('poolSpreadStars').innerHTML=Array.from({length:8},(_,i)=>
-    `<div class="hub-spread-star">${HubNav.createStarSvg('poolSpreadGrad_'+i,stops)}</div>`
-  ).join('');
 }
 
 ov.onclick=(e)=>{
@@ -471,12 +468,18 @@ function update(dt){
  tilt+=(-st*CFG.strafeTilt-tilt)*Math.min(1,dt*6);eyeY+=(Math.max(stand,surf)-eyeY)*Math.min(1,dt*6);
  camera.position.set(P.x+cs*sway,eyeY+bob*(1-fk)+br*CFG.breathAmp+fk*Math.sin(T*1.1)*.06,P.z-sn*sway); // [NEW] slow swell replaces footstep bob while floating
  camera.rotation.set(pitch+br*.004,yaw,tilt+br*.002+fk*Math.sin(T*.7)*.012);
- // anomalies
+ // anomalies (rare, atmospheric encounters)
  let near=99;
  ans.forEach((a,i)=>{
-  if(!a.on){if(T>3+i*CFG.rampSecs){a.on=a.g.visible=true;respawn(a)}return}
+  if(!a.on){
+    if(T>a.nextSpawn){
+      if(Math.random()<CFG.spawnChance){a.on=a.g.visible=true;respawn(a)}
+      else{a.nextSpawn=T+45+Math.random()*45}
+    }
+    return;
+  }
   const dx=P.x-a.g.position.x,dz=P.z-a.g.position.z,d=Math.hypot(dx,dz);
-  if(d>CFG.despawn){respawn(a);return}
+  if(d>CFG.despawn){a.on=a.g.visible=false;a.nextSpawn=T+CFG.cooldownSecs+Math.random()*50;return}
   const s=CFG.anomalySpeed*dt/d;a.g.position.x+=dx*s;a.g.position.z+=dz*s;a.g.rotation.y=Math.atan2(dx,dz); // silent, relentless
   a.y+=(Math.max(CFG.anomalyFloor,floorH(Math.floor(a.g.position.x/C),Math.floor(a.g.position.z/C)))-a.y)*Math.min(1,dt*5);
   a.ph+=dt*3;a.g.position.y=a.y+Math.sin(a.ph*2)*.04;
