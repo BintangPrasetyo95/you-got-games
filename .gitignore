@@ -1,2 +1,4 @@
 design.md
 .vscode
+.agents/hooks.json
+.cursor/hooks.json

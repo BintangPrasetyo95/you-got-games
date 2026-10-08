@@ -131,12 +131,28 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
 .card .icon { font-size: 70px; line-height: 1.15; margin-top: 14px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
 .card h3 { font-size: 21px; line-height: 1.15; }
 .card p { font-size: 14px; line-height: 1.4; color: #c4cbe2; }
+.card .lock { font-size: 11px; font-weight: 800; color: var(--gold); background: rgba(255, 207, 90, 0.1); border: 1px solid rgba(255, 207, 90, 0.35); border-radius: 8px; padding: 3px 8px; }
+.card .lock.on { color: var(--good); background: rgba(98, 240, 160, 0.1); border-color: rgba(98, 240, 160, 0.35); }
 .pips { display: flex; gap: 4px; margin-top: auto; }
 .pip { width: 14px; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); }
 .pip.on { background: var(--c); }
 .pip.next { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
 .cat-Weapon { --c: var(--coral); } .cat-Arrow { --c: var(--gold); } .cat-Status { --c: var(--violet); }
 .cat-Defense { --c: var(--teal); } .cat-Utility { --c: var(--sky); } .cat-Stat { --c: #cfd6ee; }
+.cat-Melee { --c: var(--coral); } .cat-Magic { --c: #c58bff; }
+
+/* ---------- hero class picker (start screen) ---------- */
+.classes { display: flex; flex-wrap: wrap; gap: 10px; max-width: 540px; margin-top: 2px; }
+.cls-card { --c: var(--gold); flex: 1 1 150px; max-width: 174px; padding: 12px 13px 11px; border-radius: 16px; border: 2px solid var(--line); border-top: 6px solid var(--c); background: linear-gradient(180deg, rgba(27, 39, 80, 0.92), rgba(15, 23, 49, 0.92)); color: var(--text); font-family: var(--font); text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 5px; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
+.cls-card.k-archer { --c: var(--gold); } .cls-card.k-knight { --c: var(--coral); } .cls-card.k-mage { --c: var(--violet); }
+.cls-card .ci { font-size: 34px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5)); }
+.cls-card .cn { font-size: 19px; font-weight: 900; line-height: 1.1; }
+.cls-card p { font-size: 12.5px; line-height: 1.35; color: #c4cbe2; }
+.cls-card .tr { font-size: 11.5px; font-weight: 800; color: var(--c); }
+.cls-card .sel { display: none; font-size: 11.5px; font-weight: 900; color: var(--good); }
+.cls-card:hover { transform: translateY(-3px); }
+.cls-card[aria-pressed="true"] { border-color: var(--c); background: linear-gradient(180deg, #2b3a74, #162150); transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 0 3px color-mix(in srgb, var(--c) 35%, transparent); }
+.cls-card[aria-pressed="true"] .sel { display: block; }
 
 @media (max-width: 760px) {
   #right { width: 168px; } #stats { width: 190px; } .stats { grid-template-columns: repeat(2, 1fr); }
@@ -144,7 +160,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
   .card .icon { font-size: 48px; margin: 0; }
   #board-wrap { padding: 6px 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .card, .kf { animation: none; } .btn, .card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .card, .kf { animation: none; } .btn, .card, .cls-card { transition: none; } }
 </style>
 </head>
 <body>
@@ -191,7 +207,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
     <div id="lvbadge">Lv 1</div>
     <div id="expbar"><div id="expfill"></div><span id="exptext">0 / 24</span></div>
   </div>
-  <div id="tip" class="panel">Move with WASD, aim with the mouse, hold left click to shoot</div>
+  <div id="tip" class="panel">Move with WASD, aim with the mouse, hold left click to attack</div>
 </div>
 <div id="vignette"></div>
 <div id="stick-move" class="stick hidden"><i></i></div>
@@ -210,7 +226,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
     <path d="M486 3 L514 13 L486 23 Z" fill="#ff6b4a"/>
     <path d="M18 13 L4 3 M18 13 L4 23 M34 13 L20 3 M34 13 L20 23" stroke="#ff6b4a" stroke-width="4" stroke-linecap="round"/>
   </svg>
-  <p class="lead">An endless arena with 28 rival archers. Shoot, loot gems, level up, and stack upgrades until your arrows are a problem for everyone else.</p>
+  <p class="lead">An endless arena with 28 rival heroes. Pick a class, loot gems, level up, and stack upgrades until your build is a problem for everyone else.</p>
   <div class="row">
     <input id="name-input" maxlength="14" placeholder="Your nickname" autocomplete="off" spellcheck="false" aria-label="Nickname">
     <button class="btn" id="btn-play">Play</button>
@@ -219,14 +235,31 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
       <span>← Hub Menu</span>
     </a>
   </div>
+  <div class="classes" role="group" aria-label="Choose your hero class">
+    <button type="button" class="cls-card k-archer" data-cls="archer" aria-pressed="true">
+      <span class="ci">🏹</span><b class="cn">Archer</b>
+      <p>Fires fast arrows from range. Stack volleys, homing, ricochet, fire and frost.</p>
+      <span class="tr">Trait: strikes from afar</span><span class="sel">✔ Selected</span>
+    </button>
+    <button type="button" class="cls-card k-knight" data-cls="knight" aria-pressed="false">
+      <span class="ci">⚔️</span><b class="cn">Knight</b>
+      <p>Swings a sword arc that hits everything in front. Tough, with cleave, bleed and knockback.</p>
+      <span class="tr">Trait: up to 6 orbiting shields</span><span class="sel">✔ Selected</span>
+    </button>
+    <button type="button" class="cls-card k-mage" data-cls="mage" aria-pressed="false">
+      <span class="ci">🔮</span><b class="cn">Mage</b>
+      <p>Hurls big, slow orbs that explode. Add chain lightning, multi-cast and gravity.</p>
+      <span class="tr">Trait: heavy splash damage</span><span class="sel">✔ Selected</span>
+    </button>
+  </div>
   <dl class="keys">
     <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Move (arrow keys work too)</dd>
     <dt><kbd>Mouse</kbd></dt><dd>Aim</dd>
-    <dt><kbd>Click</kbd></dt><dd>Hold to shoot</dd>
+    <dt><kbd>Click</kbd></dt><dd>Hold to attack</dd>
     <dt><kbd>Esc</kbd><kbd>P</kbd></dt><dd>Pause</dd>
     <dt><kbd>M</kbd></dt><dd>Mute</dd>
   </dl>
-  <p class="lead" id="touch-hint" style="font-size:14px">On touch screens: left thumb moves, right thumb aims and shoots.</p>
+  <p class="lead" id="touch-hint" style="font-size:14px">On touch screens: left thumb moves, right thumb aims and attacks.</p>
 </div>
 
 <!-- Pause -->
@@ -239,6 +272,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
   <div class="row" style="justify-content:center">
     <button class="btn" id="btn-resume">Resume</button>
     <button class="btn ghost" id="btn-restart">Restart</button>
+    <button class="btn ghost" id="btn-hero-p">Change hero</button>
     <a href="../index.html" class="btn ghost" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
       <span class="arrower-btn-star"><svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#arrowerStarGrad)"></use></svg></span>
       <span>← Hub Menu</span>
@@ -259,7 +293,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
     <svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#arrowerStarGrad)"></use></svg>
   </div>
   <div class="big-title">Eliminated</div>
-  <p class="sub" id="over-by">Taken down by an archer</p>
+  <p class="sub" id="over-by">Taken down by a rival hero</p>
   <div class="stats">
     <div class="stat"><b id="o-level">1</b><span>Level</span></div>
     <div class="stat"><b id="o-kills">0</b><span>Kills</span></div>
@@ -268,6 +302,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
   </div>
   <div class="row" style="display:flex; gap:12px; justify-content:center; align-items:center;">
     <button class="btn" id="btn-again">Play again</button>
+    <button class="btn ghost" id="btn-hero-o">Change hero</button>
     <a href="../index.html" class="btn ghost" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
       <span class="arrower-btn-star"><svg viewBox="0 0 200 200"><use href="#star-path" fill="url(#arrowerStarGrad)"></use></svg></span>
       <span>← Hub Menu</span>
@@ -290,6 +325,7 @@ const CFG = {
   BOT_MIN: 25, BOT_MAX: 30, BOT_TARGET: 28,
   CAM_H: 640, CAM_Z: 410, FOV: 42,
   ARROW_SPEED: 820, ARROW_RANGE: 760, ARROW_Y: 32,
+  ORB_SPEED: 380, ORB_RANGE: 780,
   GEM_TARGET: 80, HEART_TARGET: 6,
   PLAYER: { hp: 100, speed: 262, dmg: 18, cd: 0.5 }
 };
@@ -319,7 +355,7 @@ const Sound = {
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.34;
+      this.master.gain.value = 0.85;     // global volume (was 0.34)
       this.master.connect(this.ctx.destination);
       const len = (this.ctx.sampleRate * 0.6) | 0;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -362,6 +398,9 @@ const Sound = {
   },
   shoot() { if (!this.gate('shoot', 40)) return; this.tone(880, 0.09, { type: 'square', vol: 0.09, slideTo: 320 }); },
   botShoot(dist) { const v = clamp(1 - dist / 950, 0, 1); if (v < 0.06 || !this.gate('bshoot', 60)) return; this.tone(520, 0.08, { type: 'square', vol: 0.055 * v, slideTo: 220 }); },
+  swing(v) { v = v === undefined ? 1 : v; if (v < 0.06 || !this.gate('swing', 45)) return; this.noiseBurst(0.13, { vol: 0.17 * v, f0: 3400, f1: 700 }); this.tone(240, 0.1, { type: 'sawtooth', vol: 0.05 * v, slideTo: 110 }); },
+  cast(v) { v = v === undefined ? 1 : v; if (v < 0.06 || !this.gate('cast', 60)) return; this.tone(280, 0.24, { type: 'sine', vol: 0.13 * v, slideTo: 640 }); this.tone(140, 0.2, { type: 'triangle', vol: 0.08 * v, slideTo: 80 }); },
+  zap() { if (!this.gate('zap', 70)) return; this.tone(1300, 0.12, { type: 'sawtooth', vol: 0.07, slideTo: 260 }); },
   hit(vol) { if (!this.gate('hit', 35)) return; vol = vol || 1; this.noiseBurst(0.14, { vol: 0.22 * vol, f0: 2600, f1: 300 }); this.tone(140, 0.12, { type: 'square', vol: 0.12 * vol, slideTo: 50 }); },
   hurt() { if (!this.gate('hurt', 120)) return; this.tone(240, 0.22, { type: 'sawtooth', vol: 0.2, slideTo: 70 }); this.noiseBurst(0.12, { vol: 0.15, f0: 1200, f1: 200 }); },
   exp() {
@@ -397,7 +436,7 @@ const Sound = {
     this.hum.o1.frequency.setTargetAtTime(98 + level * 45, t, 0.2);
   },
   explode() { if (!this.gate('boom', 70)) return; this.noiseBurst(0.45, { vol: 0.38, f0: 1100, f1: 60 }); this.tone(95, 0.4, { type: 'sawtooth', vol: 0.2, slideTo: 30 }); },
-  block() { if (!this.gate('block', 40)) return; this.tone(1500, 0.07, { type: 'triangle', vol: 0.14, slideTo: 2400 }); },
+  block(v) { v = v === undefined ? 1 : v; if (v < 0.06 || !this.gate('block', 40)) return; this.tone(1500, 0.07, { type: 'triangle', vol: 0.14 * v, slideTo: 2400 }); },
   thorn() { if (!this.gate('thorn', 120)) return; this.tone(300, 0.07, { type: 'sawtooth', vol: 0.08, slideTo: 600 }); },
   death() { this.tone(420, 0.8, { type: 'sawtooth', vol: 0.26, slideTo: 40 }); this.noiseBurst(0.6, { vol: 0.3, f0: 1500, f1: 60 }); },
   click() { this.tone(700, 0.05, { type: 'square', vol: 0.08, slideTo: 1000 }); },
@@ -488,6 +527,13 @@ const G = {
   hand: new THREE.SphereGeometry(5.5, 10, 8),
   bow: new THREE.TorusGeometry(20, 2, 6, 18, Math.PI).rotateZ(-Math.PI / 2).rotateY(-Math.PI / 2),
   string: new THREE.CylinderGeometry(0.6, 0.6, 40, 4),
+  blade: new THREE.BoxGeometry(6, 1.6, 56).translate(0, 0, 39),            // Knight sword: flattened box blade (z 11..67)
+  guard: new THREE.BoxGeometry(18, 3.2, 3.2).translate(0, 0, 10),
+  grip: new THREE.BoxGeometry(3.4, 3.4, 12).translate(0, 0, 3),
+  staff: new THREE.CylinderGeometry(1.8, 2.4, 78, 8).translate(0, 16, 0),  // Mage staff (y -23..55 around the hand)
+  staffTip: new THREE.SphereGeometry(7, 14, 10),
+  orbBig: new THREE.SphereGeometry(13, 16, 12),
+  orbHalo: new THREE.SphereGeometry(21, 14, 10),
   groundRing: new THREE.RingGeometry(24, 29, 32).rotateX(-Math.PI / 2),
   bubble: new THREE.SphereGeometry(42, 18, 12),
   arrowShaft: new THREE.CylinderGeometry(1.8, 1.8, 34, 6).rotateX(Math.PI / 2),
@@ -505,6 +551,10 @@ const G = {
 const MAT = {
   bow: new THREE.MeshLambertMaterial({ color: 0xc98a3c }),
   string: new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }),
+  blade: new THREE.MeshLambertMaterial({ color: 0xe3ebf7, emissive: 0x3a4a66 }),
+  hilt: new THREE.MeshLambertMaterial({ color: 0x8a5a2b }),
+  staff: new THREE.MeshLambertMaterial({ color: 0x7a4a2a }),
+  tip: new THREE.MeshBasicMaterial({ color: 0xe0c8ff }),
   eye: new THREE.MeshBasicMaterial({ color: 0x10131f }),
   gem: new THREE.MeshLambertMaterial({ color: 0x35a2ff, emissive: 0x1c6bff, emissiveIntensity: 0.9 }),
   gemBig: new THREE.MeshLambertMaterial({ color: 0x8fe2ff, emissive: 0x39a8ff, emissiveIntensity: 1.0 }),
@@ -518,6 +568,8 @@ const MAT = {
 const basicCache = {}, ringCache = {};
 function basic(hex) { return basicCache[hex] || (basicCache[hex] = new THREE.MeshBasicMaterial({ color: hex })); }
 function ringMat(hex) { return ringCache[hex] || (ringCache[hex] = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false })); }
+const haloCache = {};
+function haloMat(hex) { return haloCache[hex] || (haloCache[hex] = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.3, depthWrite: false })); }
 const WALL_MATS = [[0x3b4a78, 0x5a6ea8], [0x4b3d7c, 0x6e5bb0], [0x2f5f6b, 0x4d8d9c]].map((p) => {
   const side = new THREE.MeshLambertMaterial({ color: p[0] }), top = new THREE.MeshLambertMaterial({ color: p[1] });
   return [side, side, top, side, side, side];
@@ -526,44 +578,91 @@ const WALL_MATS = [[0x3b4a78, 0x5a6ea8], [0x4b3d7c, 0x6e5bb0], [0x2f5f6b, 0x4d8d
 /* =====================================================================
    UPGRADE DEFINITIONS (all stackable; each card shows what the next stack does)
    ===================================================================== */
-const magnetRadius = (n) => n <= 0 ? 0 : 210 + 120 * (n - 1);
-const magnetPull = (n) => ({ accel: 1500 + 450 * n, max: 620 + 120 * n });
+/* ---- balance knobs ---- */
+const VAMP_PER_STACK = 0.04;           // lifesteal per Vampirism stack (was 18%)
+const HOMING_DMG_MUL = 0.80;           // Homing arrows trade 20% base damage for auto-aim
+const RICOCHET_DMG_MUL = 0.75;         // each ricochet jump keeps 75% of the arrow's current damage
+const PIERCE_DMG_GROWTH = 1.30;        // each enemy pierced makes the arrow hit 30% harder
+const PLAYER_DMG_PER_LEVEL = 0.08;     // base damage growth per player level (was 5%)
+const botMaxHp = (lv) => Math.round(48 + 14 * lv + 0.22 * lv * lv);   // was 48 + 14L + 0.6L^2
+const thornKnock = (n) => 300 + 70 * n;                              // thorns knockback speed
+const bleedSlowFor = (n) => 0.15 + 0.07 * n;                         // Crippling Strike: bleeding targets move 22% / 29% / 36% slower (Bleed 1-3)
+/* Magnet: everyone gets a small intrinsic pull that grows with level; the upgrade adds a massive range bonus on top. */
+const baseMagnetRadius = (lvl) => Math.min(200, 90 + 3 * ((lvl || 1) - 1));
+const magnetRadius = (n, lvl) => baseMagnetRadius(lvl) + (n <= 0 ? 0 : 200 + 110 * (n - 1));
+const magnetPull = (n) => ({ accel: 1200 + 450 * n, max: 560 + 120 * n });
+const curLevel = () => player ? player.level : 1;
 const aoeRadius = (n) => 80 + 26 * n;
-const aoeMul = (n) => 0.45 + 0.15 * n;
+const aoeMul = (n) => 0.30 + 0.10 * n;
 const thornDmg = (n, lvl) => Math.round((6 + 5 * n) * (1 + 0.05 * ((lvl || 1) - 1)));
 const DIAG = [28, 45, 62].map((d) => d * Math.PI / 180);
 
+/* ---- hero classes (shared by the player and every bot) ---- */
+const CLASSES = {
+  archer: { name: 'Archer', icon: '🏹', hp: 1,   spd: 1,    dmg: 1,   cd: 1 },
+  knight: { name: 'Knight', icon: '⚔️', hp: 1.3, spd: 1.25, dmg: 1.3, cd: 0.9 },
+  mage:   { name: 'Mage',   icon: '🔮', hp: 0.9, spd: 0.97, dmg: 2.1, cd: 1.9 }
+};
+const CLASS_KEYS = Object.keys(CLASSES);
+
 const UPGRADES = {
-  shield:    { icon: '🛡️', name: 'Orbiting Shield', cat: 'Defense', max: 4, desc: (n) => 'An energy sphere orbits you and destroys enemy arrows. Shields: ' + (n + 1) + '/4, spaced ' + Math.round(360 / (n + 1)) + '° apart.' },
-  magnet:    { icon: '🧲', name: 'Gem & Health Magnet', cat: 'Utility', max: 5, desc: (n) => 'Pulls EXP gems and health drops to you. Range ' + magnetRadius(n + 1) + ', faster pull each stack.' },
-  front:     { icon: '🏹', name: 'Front Arrow +1', cat: 'Weapon', max: 4, desc: (n) => 'Fire ' + (n + 2) + ' parallel arrows forward.' },
-  diag:      { icon: '↖️↗️', name: 'Diagonal Arrows', cat: 'Weapon', max: 3, desc: (n) => 'Adds a pair of arrows fired ' + Math.round(DIAG[n] * 180 / Math.PI) + '° to each side.' },
-  side:      { icon: '⬅️➡️', name: 'Side & Rear Arrows', cat: 'Weapon', max: 3, desc: (n) => ['Fire arrows out of both sides.', 'Adds an arrow fired behind you.', 'Adds two rear-diagonal arrows.'][n] },
-  double:    { icon: '♊', name: 'Double Shot', cat: 'Weapon', max: 2, desc: (n) => 'Every shot fires ' + (n + 2) + ' volleys a split-second apart.' },
-  bounce:    { icon: '🏓', name: 'Bouncy Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows bounce off walls ' + (n + 1) + ' time' + (n ? 's' : '') + ' instead of breaking.' },
-  ricochet:  { icon: '🪃', name: 'Ricochet', cat: 'Arrow', max: 3, desc: (n) => 'On hit, arrows jump to the nearest other enemy (' + (n + 1) + ' jump' + (n ? 's' : '') + ').' },
-  pierce:    { icon: '🗡️', name: 'Piercing Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows pass through ' + (n + 1) + ' enem' + (n ? 'ies' : 'y') + ' before stopping.' },
-  homing:    { icon: '🎯', name: 'Homing Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows curve toward nearby enemies' + (n ? ', turning tighter and seeing farther.' : '.') },
-  explosive: { icon: '💣', name: 'Explosive Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows blast on impact: ' + aoeRadius(n + 1) + ' radius for ' + Math.round(aoeMul(n + 1) * 100) + '% damage.' },
-  fire:      { icon: '🔥', name: 'Fire Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits set enemies on fire: burn damage for 3s, stronger each stack.' },
-  frost:     { icon: '❄️', name: 'Frost Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits slow enemies by ' + Math.round(Math.min(0.6, 0.25 + 0.12 * (n + 1)) * 100) + '%.' },
-  poison:    { icon: '☠️', name: 'Poison Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits poison: damage over time, and poisoned enemies take 20% more damage.' },
-  vamp:      { icon: '🦇', name: 'Vampirism', cat: 'Defense', max: 4, desc: (n) => 'Heal ' + Math.round((n + 1) * 18) + '% of the damage you deal.' },
-  thorns:    { icon: '🌵', name: 'Thorns Aura', cat: 'Defense', max: 4, desc: (n) => 'Enemies touching you take ' + thornDmg(n + 1, 1) + '+ damage every 0.4s.' },
-  hp:        { icon: '❤️', name: 'Max HP Up', cat: 'Stat', max: 8, desc: () => '+20% max HP, and heal for the amount gained.' },
-  speed:     { icon: '💨', name: 'Speed Up', cat: 'Stat', max: 6, desc: () => '+8% movement speed.' },
-  atk:       { icon: '⚡', name: 'Attack Speed Up', cat: 'Stat', max: 6, desc: () => '+16% attack speed.' },
-  dmg:       { icon: '💪', name: 'Damage Up', cat: 'Stat', max: 8, desc: () => '+15% arrow damage.' }
+  shield:    { class: 'all', icon: '🛡️', name: 'Orbiting Shield', cat: 'Defense', max: 4, classMax: { knight: 6 }, desc: (n, cls) => 'An energy sphere orbits you and destroys enemy arrows and orbs. Shields: ' + (n + 1) + '/' + upMax('shield', cls) + ', spaced ' + Math.round(360 / (n + 1)) + '° apart.' },
+  magnet:    { class: 'all', icon: '🧲', name: 'Gem & Health Magnet', cat: 'Utility', max: 5, desc: (n) => 'Massive pickup range boost: ' + magnetRadius(n + 1, curLevel()) + ' total (base ' + baseMagnetRadius(curLevel()) + ' grows with level), faster pull each stack.' },
+  front:     { class: 'archer', icon: '🏹', name: 'Front Arrow +1', cat: 'Weapon', max: 4, desc: (n) => 'Fire ' + (n + 2) + ' parallel arrows forward.' },
+  diag:      { class: 'archer', icon: '↖️↗️', name: 'Diagonal Arrows', cat: 'Weapon', max: 3, desc: (n) => 'Adds a pair of arrows fired ' + Math.round(DIAG[n] * 180 / Math.PI) + '° to each side.' },
+  side:      { class: 'archer', icon: '⬅️➡️', name: 'Side & Rear Arrows', cat: 'Weapon', max: 3, desc: (n) => ['Fire arrows out of both sides.', 'Adds an arrow fired behind you.', 'Adds two rear-diagonal arrows.'][n] },
+  double:    { class: 'archer', icon: '♊', name: 'Double Shot', cat: 'Weapon', max: 2, desc: (n) => 'Every shot fires ' + (n + 2) + ' volleys a split-second apart.' },
+  bounce:    { class: 'archer', icon: '🏓', name: 'Bouncy Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows bounce off walls ' + (n + 1) + ' time' + (n ? 's' : '') + ' instead of breaking.' },
+  ricochet:  { class: 'archer', icon: '🪃', name: 'Ricochet', cat: 'Arrow', max: 3, desc: (n) => 'On hit, arrows jump to the nearest other enemy (' + (n + 1) + ' jump' + (n ? 's' : '') + '). Each jump costs 25% damage.' },
+  pierce:    { class: 'archer', icon: '🗡️', name: 'Piercing Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows pass through ' + (n + 1) + ' enem' + (n ? 'ies' : 'y') + ' before stopping, hitting 30% harder after each one.' },
+  homing:    { class: 'archer', icon: '🎯', name: 'Homing Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows curve toward nearby enemies' + (n ? ', turning tighter and seeing farther' : '') + '. Costs 20% arrow damage.' },
+  explosive: { class: 'archer', icon: '💣', name: 'Explosive Arrows', cat: 'Arrow', max: 3, desc: (n) => 'Arrows blast on impact: ' + aoeRadius(n + 1) + ' radius for ' + Math.round(aoeMul(n + 1) * 100) + '% damage.' },
+  fire:      { class: 'archer', icon: '🔥', name: 'Fire Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits set enemies on fire: burn damage for 3s, stronger each stack.' },
+  frost:     { class: 'archer', icon: '❄️', name: 'Frost Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits slow enemies by ' + Math.round(Math.min(0.6, 0.25 + 0.12 * (n + 1)) * 100) + '%.' },
+  poison:    { class: 'archer', icon: '☠️', name: 'Poison Arrows', cat: 'Status', max: 3, desc: (n) => 'Hits poison: damage over time, and poisoned enemies take 20% more damage.' },
+  vamp:      { class: 'all', icon: '🦇', name: 'Vampirism', cat: 'Defense', max: 4, desc: (n) => 'Heal ' + Math.round((n + 1) * VAMP_PER_STACK * 100) + '% of the damage you deal.' },
+  thorns:    { class: 'all', icon: '🌵', name: 'Thorns Aura', cat: 'Defense', max: 4, desc: (n) => 'Enemies touching you take ' + thornDmg(n + 1, 1) + '+ damage every 0.4s and knocks them back.' },
+  hp:        { class: 'all', icon: '❤️', name: 'Max HP Up', cat: 'Stat', max: 8, desc: () => '+20% max HP, and heal for the amount gained.' },
+  speed:     { class: 'all', icon: '💨', name: 'Speed Up', cat: 'Stat', max: 6, desc: () => '+8% movement speed.' },
+  atk:       { class: 'all', icon: '⚡', name: 'Attack Speed Up', cat: 'Stat', max: 6, desc: () => '+16% attack speed.' },
+  dmg:       { class: 'all', icon: '💪', name: 'Damage Up', cat: 'Stat', max: 8, desc: () => '+15% attack damage.' },
+  cleave:    { class: 'knight', icon: '🌀', name: 'Wide Cleave', cat: 'Melee', max: 3, desc: (n) => 'Sword reach +' + 14 * (n + 1) + '% and the swing arc widens to ' + Math.round(halfFor(n + 1) * 360 / Math.PI) + '°.' },
+  heavy:     { class: 'knight', icon: '🔨', name: 'Heavy Strike', cat: 'Melee', max: 3, desc: (n) => 'Hits deal +' + 12 * (n + 1) + '% damage and hurl enemies back about ' + Math.round((300 + 260 * (n + 1)) / 5) + ' units.' },
+  bleed:     { class: 'knight', icon: '🩸', name: 'Bleed', cat: 'Melee', max: 3, desc: (n) => 'Sword hits cause bleeding for 3.5s: ' + Math.round((0.1 + 0.07 * (n + 1)) * 100) + '% of the hit per second, and bleeding enemies move ' + Math.round(bleedSlowFor(n + 1) * 100) + '% slower.' },
+  fury:      { class: 'knight', icon: '😤', name: 'Berserker Fury', cat: 'Melee', max: 3, desc: (n) => 'Deal up to +' + 30 * (n + 1) + '% damage as your health drops.' },
+  splash:    { class: 'mage', icon: '💥', name: 'Splash Radius', cat: 'Magic', max: 3, desc: (n) => 'Orb blast radius grows from ' + orbSplash(n) + ' to ' + orbSplash(n + 1) + '.' },
+  chain:     { class: 'mage', icon: '🌩️', name: 'Chain Lightning', cat: 'Magic', max: 3, desc: (n) => 'Orb hits arc to ' + (n + 2) + ' more nearby enemies for 55% damage each.' },
+  multi:     { class: 'mage', icon: '🔮', name: 'Multi-Cast', cat: 'Magic', max: 3, desc: (n) => 'Cast ' + (n + 2) + ' orbs per shot, fanned out.' },
+  gravity:   { class: 'mage', icon: '🌌', name: 'Gravity Well', cat: 'Magic', max: 3, desc: (n) => 'Orb blasts drag enemies toward the center' + (n ? ', harder each stack' : '') + '.' }
 };
 const UP_KEYS = Object.keys(UPGRADES);
 function newUp() { const u = {}; for (const k of UP_KEYS) u[k] = 0; return u; }
 
+/* Mutually exclusive upgrade groups: the first point spent in a group permanently locks out the rest of it.
+   Lock state is derived from the entity's own upgrade levels (which never go down), so it lasts the whole run. */
+const EXCLUSIVE_GROUPS = [
+  { id: 'status',   label: 'Status Elements', keys: ['fire', 'frost', 'poison'] },
+  { id: 'behavior', label: 'Arrow Behaviors', keys: ['homing', 'explosive', 'ricochet', 'pierce', 'bounce'] }
+];
+const EXCL_OF = {};
+for (const g of EXCLUSIVE_GROUPS) for (const k of g.keys) EXCL_OF[k] = g;
+function isLockedOut(up, k) {
+  const g = EXCL_OF[k];
+  if (!g) return false;
+  for (const o of g.keys) if (o !== k && up[o] > 0) return true;
+  return false;
+}
+function canTake(up, k, cap) { return up[k] < (cap === undefined ? UPGRADES[k].max : cap) && !isLockedOut(up, k); }
+function upMax(k, cls) { const D = UPGRADES[k]; return (D.classMax && D.classMax[cls]) || D.max; }   // Knights: shield cap 6
+const classOK = (k, cls) => UPGRADES[k].class === 'all' || UPGRADES[k].class === cls;
+
 /* =====================================================================
    GAME STATE
    ===================================================================== */
+let pickedClass = 'archer';
 let state = 'menu';           // menu | playing | paused | levelup | dead
 let player = null;
-let bots = [], arrows = [], gems = [], hearts = [], walls = [], shields = [], fx = [], floaters = [];
+let bots = [], arrows = [], gems = [], hearts = [], walls = [], shields = [], fx = [], floaters = [], swings = [];
 const ents = [];              // every living combatant this frame (player + bots)
 const pending = [];           // delayed Double Shot volleys (frozen while paused)
 const chunks = new Map();
@@ -582,7 +681,8 @@ const TIERS = [
 /* =====================================================================
    CHARACTERS (composite THREE.Group: torso, head, floating hands, bow)
    ===================================================================== */
-function makeCharacter(bodyHex, headHex, ringHex) {
+function makeCharacter(bodyHex, headHex, ringHex, cls) {
+  cls = cls || 'archer';
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshLambertMaterial({ color: bodyHex });
   const headMat = new THREE.MeshLambertMaterial({ color: headHex });
@@ -591,20 +691,36 @@ function makeCharacter(bodyHex, headHex, ringHex) {
   for (const sx of [-1, 1]) { const eye = new THREE.Mesh(G.eye, MAT.eye); eye.position.set(sx * 5.6, 60, 13); group.add(eye); }
   const handL = new THREE.Mesh(G.hand, bodyMat); handL.position.set(0, 31, 33); group.add(handL);
   const handR = new THREE.Mesh(G.hand, bodyMat); handR.position.set(8, 31, 9); group.add(handR);
-  const bow = new THREE.Group(); bow.position.set(0, 31, 12);
-  bow.add(new THREE.Mesh(G.bow, MAT.bow)); bow.add(new THREE.Mesh(G.string, MAT.string));
-  group.add(bow);
+  const wpn = new THREE.Group(); let tip = null;       // weapon group pivots around the right hand
+  if (cls === 'knight') {                              // sword: flattened box blade + crossguard + grip
+    handL.position.set(-15, 31, 8);
+    wpn.position.set(17, 31, 10); wpn.rotation.y = 0.35;
+    wpn.add(new THREE.Mesh(G.blade, MAT.blade), new THREE.Mesh(G.guard, MAT.hilt), new THREE.Mesh(G.grip, MAT.hilt));
+    handR.position.set(0, 0, 0); wpn.add(handR);
+  } else if (cls === 'mage') {                         // staff: wooden cylinder topped with a glowing sphere
+    handL.position.set(-15, 31, 8);
+    wpn.position.set(17, 31, 12);
+    wpn.add(new THREE.Mesh(G.staff, MAT.staff));
+    tip = new THREE.Group(); tip.position.y = 58;
+    const halo = new THREE.Mesh(G.orbHalo, haloMat(0xb58cff)); halo.scale.setScalar(0.6);
+    tip.add(new THREE.Mesh(G.staffTip, MAT.tip), halo); wpn.add(tip);
+    handR.position.set(0, 0, 0); wpn.add(handR);
+  } else {                                             // archer: bow + string (unchanged)
+    wpn.position.set(0, 31, 12);
+    wpn.add(new THREE.Mesh(G.bow, MAT.bow), new THREE.Mesh(G.string, MAT.string));
+  }
+  group.add(wpn);
   const ring = new THREE.Mesh(G.groundRing, ringMat(ringHex)); ring.position.y = 0.8; group.add(ring);
-  return { group: group, bodyMat: bodyMat, headMat: headMat, head: head, torso: torso, handL: handL, handR: handR, bow: bow, ring: ring };
+  return { group: group, bodyMat: bodyMat, headMat: headMat, head: head, torso: torso, handL: handL, handR: handR, bow: wpn, wpn: wpn, tip: tip, ring: ring };
 }
 
 function newEntity(o) {
   return Object.assign({
-    id: nextId++, isPlayer: false, dead: false, name: 'Bot', level: 1,
-    x: 0, z: 0, vx: 0, vz: 0, aim: 0, r: 22, scale: 1,
+    id: nextId++, isPlayer: false, dead: false, name: 'Bot', level: 1, cls: 'archer', swingHalf: 1.57,
+    x: 0, z: 0, vx: 0, vz: 0, kx: 0, kz: 0, aim: 0, r: 22, scale: 1,
     hp: 100, maxHp: 100, speed: 250, dmg: 10, cooldown: 1, cd: 0, recoil: 0,
     score: 0, kills: 0, flash: 0, invuln: 0, tintKey: -1,
-    up: newUp(), st: { burn: 0, burnDps: 0, frost: 0, frostSlow: 0, poison: 0, poisonDps: 0 },
+    up: newUp(), st: { burn: 0, burnDps: 0, frost: 0, frostSlow: 0, poison: 0, poisonDps: 0, bleed: 0, bleedDps: 0, bleedSlow: 0 },
     dotAcc: 0, dotT: 0, dotType: 'burn', dotSrc: null, lastAttacker: null
   }, o);
 }
@@ -614,13 +730,13 @@ function makeHpBar(e, cls) {
   el.innerHTML = '<div class="nm"><span class="lv"></span><span class="tx"></span></div><div class="tr"><div class="fl"></div></div><div class="sti"></div>';
   worldUi.appendChild(el);
   const ui = { el: el, lv: el.querySelector('.lv'), tx: el.querySelector('.tx'), fl: el.querySelector('.fl'), sti: el.querySelector('.sti'), vis: true, pct: 100, st: '', lvCls: '' };
-  ui.tx.textContent = e.name; ui.lv.textContent = 'Lv ' + e.level;
+  ui.tx.textContent = CLASSES[e.cls].icon + ' ' + e.name; ui.lv.textContent = 'Lv ' + e.level;
   return ui;
 }
 
-function createPlayer(name) {
-  const p = newEntity({ isPlayer: true, name: name || 'You', level: 1, hp: 0, maxHp: 0 });
-  p.parts = makeCharacter(0x00cfff, 0xe6fbff, 0xffffff);
+function createPlayer(name, heroClass) {
+  const p = newEntity({ isPlayer: true, name: name || 'You', level: 1, hp: 0, maxHp: 0, cls: CLASSES[heroClass] ? heroClass : 'archer' });
+  p.parts = makeCharacter(0x00cfff, 0xe6fbff, 0xffffff, p.cls);
   p.exp = 0; p.totalExp = 0; p.expNeed = expFor(1); p.t = 0; p.invuln = 3.2; p.score = 0;
   p.bubble = new THREE.Mesh(G.bubble, MAT.bubble); p.bubble.position.y = 34; p.parts.group.add(p.bubble);
   scene.add(p.parts.group);
@@ -632,28 +748,35 @@ function createPlayer(name) {
 }
 
 function recalcPlayer() {
-  const p = player, u = p.up;
+  const p = player, u = p.up, C = CLASSES[p.cls];
   p.scale = 1 + Math.min(0.5, (p.level - 1) * 0.02);
   p.r = 22 * p.scale;
   p.parts.group.scale.setScalar(p.scale);
-  const newMax = Math.round((CFG.PLAYER.hp + 6 * (p.level - 1)) * (1 + 0.2 * u.hp));
+  const newMax = Math.round((CFG.PLAYER.hp + 6 * (p.level - 1)) * (1 + 0.2 * u.hp) * C.hp);
   const diff = newMax - p.maxHp;
   p.maxHp = newMax;
   if (diff > 0) p.hp = Math.min(p.maxHp, p.hp + diff);
-  p.speed = CFG.PLAYER.speed * (1 + 0.08 * u.speed);
-  p.cooldown = CFG.PLAYER.cd / (1 + 0.16 * u.atk);
-  p.dmg = CFG.PLAYER.dmg * (1 + 0.05 * (p.level - 1)) * (1 + 0.15 * u.dmg);
+  p.speed = CFG.PLAYER.speed * (1 + 0.08 * u.speed) * C.spd;
+  p.cooldown = CFG.PLAYER.cd * C.cd / (1 + 0.16 * u.atk);
+  p.dmg = CFG.PLAYER.dmg * (1 + PLAYER_DMG_PER_LEVEL * (p.level - 1)) * (1 + 0.15 * u.dmg) * C.dmg;
 }
 
 /* ---------- bots ---------- */
-const BOT_UP_CAPS = { front: 2, diag: 2, side: 1, double: 1, bounce: 2, ricochet: 1, pierce: 2, homing: 2, explosive: 1, fire: 2, frost: 2, poison: 2 };
-const BOT_LATE = ['ricochet', 'explosive', 'fire', 'frost', 'poison', 'homing'];
-function rollBotUpgrades(level) {
-  const u = newUp();
+const BOT_UP_CAPS = {   // per-class pools: bots only ever roll upgrades that match their weapon
+  archer: { front: 2, diag: 2, side: 1, double: 1, bounce: 2, ricochet: 1, pierce: 2, homing: 2, explosive: 1, fire: 2, frost: 2, poison: 2 },
+  knight: { cleave: 3, heavy: 2, bleed: 2, fury: 2 },
+  mage: { splash: 2, chain: 2, multi: 2, gravity: 2 }
+};
+const BOT_LATE = ['ricochet', 'explosive', 'fire', 'frost', 'poison', 'homing', 'bleed', 'chain'];
+function rollBotUpgrades(level, cls) {
+  const caps = BOT_UP_CAPS[cls], u = newUp();
   let picks = Math.min(9, Math.floor((level - 1) / 2.5));
-  const pool = Object.keys(BOT_UP_CAPS).filter((k) => level >= 4 || BOT_LATE.indexOf(k) < 0);
-  let guard = 60;
-  while (picks > 0 && guard-- > 0) { const k = pick(pool); if (u[k] < BOT_UP_CAPS[k]) { u[k]++; picks--; } }
+  const base = Object.keys(caps).filter((k) => level >= 4 || BOT_LATE.indexOf(k) < 0);
+  while (picks > 0) {                                   // re-filter every pick so exclusive groups lock out immediately
+    const pool = base.filter((k) => canTake(u, k, caps[k]));
+    if (!pool.length) break;
+    u[pick(pool)]++; picks--;
+  }
   return u;
 }
 
@@ -677,24 +800,26 @@ function spawnBot(initial) {
   const scale = 1 + Math.min(0.85, (botLevel - 1) * 0.04);
   const used = new Set(bots.map((b) => b.name));
   let nm = pick(BOT_NAMES), g = 12; while (used.has(nm) && g-- > 0) nm = pick(BOT_NAMES);
-  const maxHp = Math.round(48 + botLevel * 14 + botLevel * botLevel * 0.6);
-  const style = pick(['kiter', 'kiter', 'chaser', 'sniper']);
+  const cls = pick(CLASS_KEYS), C = CLASSES[cls];
+  const maxHp = Math.round(botMaxHp(botLevel) * C.hp);
+  const style = cls === 'knight' ? 'chaser' : pick(['kiter', 'kiter', 'sniper']);   // Knights rush; Archers & Mages kite/snipe
   const b = newEntity({
-    name: nm, level: botLevel, tier: tier, scale: scale, r: 22 * scale,
+    name: nm, level: botLevel, tier: tier, scale: scale, r: 22 * scale, cls: cls,
     maxHp: maxHp, hp: maxHp,
-    speed: Math.min(290, 165 + botLevel * 6),
-    dmg: 6 + botLevel * 1.35,
-    cooldown: Math.max(0.75, 1.5 - botLevel * 0.04),
-    up: rollBotUpgrades(botLevel),
+    speed: Math.min(290, 165 + botLevel * 6) * C.spd,
+    dmg: (6 + botLevel * 1.35) * C.dmg,
+    cooldown: Math.max(0.75, 1.5 - botLevel * 0.04) * C.cd,
+    up: rollBotUpgrades(botLevel, cls),
     style: style, keepDist: style === 'chaser' ? 90 : (style === 'sniper' ? 470 : 340),
-    detect: Math.min(700, 600 + botLevel * 6), range: 640,
+    detect: Math.min(700, 600 + botLevel * 6), range: 640, projSpeed: cls === 'archer' ? CFG.ARROW_SPEED : (cls === 'mage' ? CFG.ORB_SPEED : 1400),
     accErr: Math.max(0.04, 0.13 - botLevel * 0.003),
     mode: 'roam', target: null, los: false, thinkT: Math.random() * 0.3, strafeDir: Math.random() < 0.5 ? -1 : 1, strafeT: rand(0.5, 2),
     wx: 0, wz: 0, wanderT: 0, err: 0, aimTarget: 0, stuck: 0, unstickT: 0, ux: 0, uz: 0, fleeT: 0, px: 0, pz: 0
   });
+  b.range = cls === 'knight' ? meleeReach(b) : (cls === 'mage' ? 580 : 640);   // melee bots swing once the target is inside sword reach
   b.cd = Math.random() * b.cooldown;
   b.score = cumExp(botLevel) + randi(0, 40);
-  b.parts = makeCharacter(T.body, T.head, T.body);
+  b.parts = makeCharacter(T.body, T.head, T.body, cls);
   b.parts.group.scale.setScalar(scale);
   let x = 0, z = 0, tries = 0;
   do {
@@ -718,46 +843,69 @@ function destroyBotVisuals(b) {
 }
 
 /* =====================================================================
-   INFINITE WORLD: chunked low-density walls, pillars and L-shaped covers
+   INFINITE WORLD: chunked blueprint layouts (crossroads, pillars, halls, L-ruins, blockade)
    ===================================================================== */
 function genChunk(ix, iz) {
   const C = CFG.CHUNK, x0 = ix * C, z0 = iz * C;
+  // Deterministic RNG based on chunk coordinates
   const rng = mulberry32(((ix * 73856093) ^ (iz * 19349663) ^ 0x9e3779b9) | 0);
   const chunk = { ix: ix, iz: iz, cx: x0 + C / 2, cz: z0 + C / 2, walls: [] };
-  const r = rng();
-  const count = r < 0.3 ? 0 : (r < 0.84 ? 1 : 2);     // low-to-moderate density
-  const placed = [];
-  for (let s = 0; s < count; s++) {
-    const type = rng(), fam = Math.floor(rng() * 3), pieces = [];
-    let ext;
-    if (type < 0.34) {                                  // pillar
-      const sz = 46 + rng() * 34; ext = sz;
-      pieces.push({ dx: 0, dz: 0, w: sz, d: sz, h: 96 + rng() * 40 });
-    } else if (type < 0.72) {                           // straight cover wall
-      const len = 220 + rng() * 200, th = 40 + rng() * 10; ext = len;
-      if (rng() < 0.5) pieces.push({ dx: 0, dz: 0, w: len, d: th, h: 72 }); else pieces.push({ dx: 0, dz: 0, w: th, d: len, h: 72 });
-    } else {                                            // L-shaped cover
-      const a = 190 + rng() * 100, b = 150 + rng() * 80, th = 42, fx = rng() < 0.5 ? -1 : 1, fz = rng() < 0.5 ? -1 : 1;
-      ext = Math.max(a, b) * 2;
-      pieces.push({ dx: fx * (a / 2 - th / 2), dz: 0, w: a, d: th, h: 66 });
-      pieces.push({ dx: 0, dz: fz * (th / 2 + b / 2), w: th, d: b, h: 66 });
-    }
-    const half = Math.min(ext / 2, 300);
-    const px = x0 + half + 16 + rng() * Math.max(10, C - half * 2 - 32);
-    const pz = z0 + half + 16 + rng() * Math.max(10, C - half * 2 - 32);
-    if (Math.hypot(px, pz) < 380) continue;             // keep the spawn area open
-    if (placed.some((q) => Math.hypot(q.x - px, q.z - pz) < 320)) continue;
-    placed.push({ x: px, z: pz });
-    for (const pc of pieces) {
-      const mesh = new THREE.Mesh(G.unitBox, WALL_MATS[fam]);
-      mesh.scale.set(pc.w, pc.h, pc.d);
-      mesh.position.set(px + pc.dx, pc.h / 2, pz + pc.dz);
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      scene.add(mesh);
-      const w = { x: px + pc.dx, z: pz + pc.dz, hw: pc.w / 2, hd: pc.d / 2, mesh: mesh, chunk: chunk };
-      chunk.walls.push(w); walls.push(w);
+  const fam = Math.floor(rng() * 3); // Pick wall texture color
+
+  // Helper to build walls relative to the chunk's center (cx, cz)
+  const build = (dx, dz, w, d, h) => {
+    const px = chunk.cx + dx, pz = chunk.cz + dz;
+    const mesh = new THREE.Mesh(G.unitBox, WALL_MATS[fam]);
+    mesh.scale.set(w, h, d);
+    mesh.position.set(px, h / 2, pz);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+    const wObj = { x: px, z: pz, hw: w / 2, hd: d / 2, mesh: mesh, chunk: chunk };
+    chunk.walls.push(wObj); walls.push(wObj);
+  };
+
+  // SPAWN PROTECTION: Keep the center chunk (0,0) completely empty
+  if (ix === 0 && iz === 0) return chunk;
+
+  const layout = Math.floor(rng() * 5); // Pick 1 of 5 blueprints
+
+  if (layout === 0) {
+    // Blueprint 0: Crossroads
+    build(0, -180, 40, 200, 72); // North
+    build(0, 180, 40, 200, 72);  // South
+    build(-180, 0, 200, 40, 72); // West
+    build(180, 0, 200, 40, 72);  // East
+  }
+  else if (layout === 1) {
+    // Blueprint 1: Four Pillars
+    build(-140, -140, 80, 80, 110);
+    build(140, -140, 80, 80, 110);
+    build(-140, 140, 80, 80, 110);
+    build(140, 140, 80, 80, 110);
+  }
+  else if (layout === 2) {
+    // Blueprint 2: Parallel Halls
+    const vertical = rng() > 0.5;
+    if (vertical) {
+      build(-150, 0, 40, 400, 72);
+      build(150, 0, 40, 400, 72);
+    } else {
+      build(0, -150, 400, 40, 72);
+      build(0, 150, 400, 40, 72);
     }
   }
+  else if (layout === 3) {
+    // Blueprint 3: Broken Arena (L-Shapes)
+    build(-180, -220, 120, 40, 66); build(-220, -180, 40, 120, 66); // Top-Left
+    build(180, 220, 120, 40, 66); build(220, 180, 40, 120, 66);     // Bottom-Right
+  }
+  else {
+    // Blueprint 4: Central Blockade
+    build(0, 0, 140, 140, 96);
+    build(-220, -220, 40, 40, 80);
+    build(220, 220, 40, 40, 80);
+  }
+
   return chunk;
 }
 function removeChunk(c) {
@@ -839,6 +987,8 @@ function buildPattern(u) {
   return out;
 }
 function fireVolley(e, echo) {
+  if (e.cls === 'knight') { startSwing(e); return; }     // class dispatch: Archer arrows below, Knight sweep / Mage orbs in CLASS WEAPONS
+  if (e.cls === 'mage') { castOrbs(e); return; }
   const pattern = buildPattern(e.up);
   const perpx = Math.cos(e.aim), perpz = -Math.sin(e.aim);
   for (const p of pattern) {
@@ -875,7 +1025,7 @@ function spawnArrow(o, x, z, ang) {
   scene.add(mesh);
   arrows.push({
     owner: o, fromPlayer: o.isPlayer, x: x, z: z, vx: Math.sin(ang) * CFG.ARROW_SPEED, vz: Math.cos(ang) * CFG.ARROW_SPEED,
-    dmg: o.dmg, life: CFG.ARROW_RANGE / CFG.ARROW_SPEED, r: 6, color: col, mesh: mesh,
+    dmg: o.dmg * (u.homing > 0 ? HOMING_DMG_MUL : 1), life: CFG.ARROW_RANGE / CFG.ARROW_SPEED, r: 6, color: col, mesh: mesh,
     bounce: u.bounce, ricochet: u.ricochet, pierce: u.pierce, homing: u.homing, explosive: u.explosive,
     fire: u.fire, frost: u.frost, poison: u.poison, hit: new Set(), hT: 0, tgt: null
   });
@@ -924,7 +1074,7 @@ function updateArrows(dt) {
     if (a.homing > 0) steerHoming(a, dt);
     const px = a.x, pz = a.z;
     a.x += a.vx * dt; a.z += a.vz * dt; a.life -= dt;
-    if (a.life <= 0) dead = true;
+    if (a.life <= 0) { dead = true; if (a.orb) orbBurst(a, null); }
     const ddx = a.x - player.x, ddz = a.z - player.z;
     if (ddx * ddx + ddz * ddz > R2) dead = true;          // distance culling
     if (!dead) {                                           // walls
@@ -939,7 +1089,7 @@ function updateArrows(dt) {
             a.mesh.rotation.y = Math.atan2(a.vx, a.vz);
             sparks(a.x, a.z, 0xffffff, 4, 160);
           } else {
-            if (a.explosive > 0) explode(a.x, a.z, a, null);
+            if (a.orb) orbBurst(a, null); else if (a.explosive > 0) explode(a.x, a.z, a, null);
             sparks(a.x, a.z, a.color, 5, 180);
             dead = true;
           }
@@ -965,10 +1115,15 @@ function updateArrows(dt) {
         }
       }
     }
-    if (dead) removeArrow(i); else a.mesh.position.set(a.x, CFG.ARROW_Y, a.z);
+    if (dead) removeArrow(i);
+    else {
+      a.mesh.position.set(a.x, CFG.ARROW_Y, a.z);
+      if (a.orb) { a.mesh.scale.setScalar(1 + Math.sin(clock * 16 + i) * 0.1); if (Math.random() < 0.3) sparks(a.x, a.z, a.color, 1, 50); }
+    }
   }
 }
 function arrowHit(a, t) {
+  if (a.orb) return orbHit(a, t);
   a.hit.add(t.id);
   damageEntity(t, a.dmg, a.owner, { arrow: true });
   if (!t.dead) applyStatus(t, a);
@@ -978,6 +1133,7 @@ function arrowHit(a, t) {
     const nt = findNearestEnemy(t.x, t.z, 430, a.owner, a.hit);
     if (nt) {
       a.ricochet--;
+      a.dmg *= RICOCHET_DMG_MUL;                      // every jump loses 25% damage
       const dx = nt.x - a.x, dz = nt.z - a.z, d = Math.hypot(dx, dz) || 1, sp = Math.hypot(a.vx, a.vz);
       a.vx = dx / d * sp; a.vz = dz / d * sp;
       a.life = Math.max(a.life, d / sp + 0.2);
@@ -985,7 +1141,10 @@ function arrowHit(a, t) {
       return false;
     }
   }
-  if (a.pierce > 0) { a.pierce--; return false; }
+  if (a.pierce > 0) {                                   // reward positioning: each pierced enemy makes the arrow hit 30% harder
+    a.pierce--; a.dmg *= PIERCE_DMG_GROWTH; a.mesh.scale.multiplyScalar(1.08);
+    return false;
+  }
   return true;
 }
 function applyStatus(t, a) {
@@ -994,7 +1153,11 @@ function applyStatus(t, a) {
   if (a.frost > 0) { s.frost = 2.2 + 0.3 * a.frost; s.frostSlow = Math.max(s.frostSlow, Math.min(0.6, 0.25 + 0.12 * a.frost)); }
   if (a.poison > 0) { s.poison = 4 + 0.5 * a.poison; s.poisonDps = Math.max(s.poisonDps, a.dmg * (0.10 + 0.08 * a.poison)); t.dotSrc = a.owner; }
 }
-function slowMul(e) { return e.st.frost > 0 ? 1 - e.st.frostSlow : 1; }
+function slowMul(e) {                                  // Frost slow. Knights shrug off half of it (max 60% -> 30%) so frost kiters can't pin them down
+  if (e.st.frost <= 0) return 1;
+  return 1 - (e.cls === 'knight' ? e.st.frostSlow * 0.5 : e.st.frostSlow);
+}
+function bleedMul(e) { return e.st.bleed > 0 ? 1 - e.st.bleedSlow : 1; }   // Crippling Strike: movement penalty while bleeding
 function explode(x, z, a, skip) {
   const rad = aoeRadius(a.explosive), mul = aoeMul(a.explosive);
   spawnBlast(x, z, rad, a.fromPlayer ? 0xffb347 : 0xff6b4a);
@@ -1008,13 +1171,134 @@ function explode(x, z, a, skip) {
   }
 }
 
+/* =====================================================================
+   CLASS WEAPONS: Knight melee sweeps and Mage orbs (Archer arrows are above)
+   ===================================================================== */
+function halfFor(n) { return Math.min(Math.PI, Math.PI / 2 + n * Math.PI / 6); }   // sweep half-angle: 180° arc, +60° per Wide Cleave
+function orbSplash(n) { return 62 + 26 * n; }
+const meleeReach = (e) => (e.r + 66) * (1 + 0.14 * e.up.cleave);
+const SWEEP_GEO = [];
+function sweepGeo(n) {
+  if (!SWEEP_GEO[n]) { const h = halfFor(n); SWEEP_GEO[n] = new THREE.CircleGeometry(1, 40, -Math.PI / 2 - h, 2 * h).rotateX(-Math.PI / 2); }
+  return SWEEP_GEO[n];
+}
+const nearVol = (e) => e.isPlayer ? 1 : clamp(1 - Math.hypot(e.x - player.x, e.z - player.z) / 950, 0, 1);
+
+function startSwing(e) {                               // Knight attack: a ~0.15s semicircular hitbox in front of the entity
+  const half = halfFor(e.up.cleave), reach = meleeReach(e);
+  const mat = new THREE.MeshBasicMaterial({ color: e.isPlayer ? 0xfff0b8 : 0xffb3a0, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(sweepGeo(e.up.cleave), mat);
+  mesh.position.set(e.x, 5, e.z); mesh.rotation.y = e.aim; mesh.scale.setScalar(reach);
+  scene.add(mesh);
+  swings.push({ o: e, a: e.aim, half: half, reach: reach, t: 0, life: 0.15, hit: new Set(), mesh: mesh, mat: mat });
+  e.recoil = 1; e.swingHalf = half;
+  Sound.swing(nearVol(e));
+}
+function updateSwings(dt) {
+  for (let i = swings.length - 1; i >= 0; i--) {
+    const s = swings[i], o = s.o;
+    s.t += dt;
+    if (s.t >= s.life || o.dead) { scene.remove(s.mesh); s.mat.dispose(); swings.splice(i, 1); continue; }
+    s.mesh.position.set(o.x, 5, o.z); s.mat.opacity = 0.55 * (1 - s.t / s.life);
+    for (const t of ents) {
+      if (t.dead || t === o || s.hit.has(t.id) || (t.isPlayer && t.invuln > 0)) continue;
+      const dx = t.x - o.x, dz = t.z - o.z, d = Math.hypot(dx, dz);
+      if (d > s.reach + t.r) continue;
+      if (s.half < Math.PI && Math.abs(angDiff(s.a, Math.atan2(dx, dz))) > s.half + Math.atan2(t.r, Math.max(d, 1))) continue;
+      if (d > 30 && segBlocked(o.x, o.z, t.x, t.z)) continue;          // walls stop the blade
+      s.hit.add(t.id);
+      meleeHit(o, t, dx, dz, d);
+    }
+    // Active parry: the blade also cuts down every hostile arrow / orb inside the sweep (same reach + half-angle as the melee hitbox)
+    for (let j = arrows.length - 1; j >= 0; j--) {
+      const a = arrows[j];
+      if (a.owner === o) continue;
+      const adx = a.x - o.x, adz = a.z - o.z, rr = s.reach + a.r, d2 = adx * adx + adz * adz;
+      if (d2 > rr * rr) continue;
+      if (s.half < Math.PI && Math.abs(angDiff(s.a, Math.atan2(adx, adz))) > s.half + Math.atan2(a.r, Math.max(Math.sqrt(d2), 1))) continue;
+      sparks(a.x, a.z, 0xfff0b8, 6, 240);
+      Sound.block(nearVol(o));
+      removeArrow(j);
+    }
+  }
+}
+function meleeHit(o, t, dx, dz, d) {
+  const u = o.up, dmg = o.dmg * (1 + 0.12 * u.heavy) * (1 + 0.3 * u.fury * (1 - clamp(o.hp / o.maxHp, 0, 1)));
+  damageEntity(t, dmg, o, { melee: true });
+  sparks(t.x, t.z, 0xfff0b8, 6, 240);
+  if (t.dead) return;
+  if (!t.isPlayer) knockback(t, dx / (d || 1), dz / (d || 1), 300 + 260 * u.heavy);   // Heavy Strike shoves bots hard (the player is never shoved)
+  if (u.bleed > 0) {
+    t.st.bleed = 3.5; t.st.bleedDps = Math.max(t.st.bleedDps, dmg * (0.1 + 0.07 * u.bleed)); t.dotSrc = o;
+    t.st.bleedSlow = Math.max(t.st.bleedSlow, bleedSlowFor(u.bleed));      // Crippling Strike: bleeding targets are slowed so they can't kite away
+  }
+}
+
+function castOrbs(e) {                                 // Mage attack: large, slow orbs (Multi-Cast fans extra ones out)
+  const n = 1 + e.up.multi;
+  for (let i = 0; i < n; i++) {
+    const a = e.aim + (i - (n - 1) / 2) * 0.24, off = e.r + 18;
+    spawnOrb(e, e.x + Math.sin(a) * off, e.z + Math.cos(a) * off, a);
+  }
+  e.recoil = 1;
+  Sound.cast(nearVol(e));
+}
+function spawnOrb(o, x, z, ang) {
+  if (arrows.length > 420 && !o.isPlayer) return;
+  const u = o.up, col = o.isPlayer ? 0xc9a2ff : 0xff6fd0, mesh = new THREE.Group();
+  mesh.add(new THREE.Mesh(G.orbBig, basic(col)), new THREE.Mesh(G.orbHalo, haloMat(col)));
+  mesh.position.set(x, CFG.ARROW_Y, z); scene.add(mesh);
+  arrows.push({   // orbs ride the arrow list, so walls, shields and entity collisions are shared with arrows
+    orb: true, owner: o, fromPlayer: o.isPlayer, x: x, z: z, vx: Math.sin(ang) * CFG.ORB_SPEED, vz: Math.cos(ang) * CFG.ORB_SPEED,
+    dmg: o.dmg, life: CFG.ORB_RANGE / CFG.ORB_SPEED, r: 15, color: col, mesh: mesh,
+    splash: orbSplash(u.splash), chain: u.chain, gravity: u.gravity,
+    bounce: 0, ricochet: 0, pierce: 0, homing: 0, explosive: 0, fire: 0, frost: 0, poison: 0, hit: new Set(), hT: 0, tgt: null
+  });
+}
+function orbBurst(a, skip) {                           // splash: 60% of the orb's damage to everything in the blast
+  spawnBlast(a.x, a.z, a.splash, a.color); Sound.explode();
+  if (Math.hypot(a.x - player.x, a.z - player.z) < 600) shake = Math.min(1, shake + 0.2);
+  for (const t of ents) {
+    if (t.dead || t === a.owner || t === skip || (t.isPlayer && t.invuln > 0)) continue;
+    const dx = t.x - a.x, dz = t.z - a.z, rr = a.splash + t.r;
+    if (dx * dx + dz * dz >= rr * rr) continue;
+    damageEntity(t, a.dmg * 0.6, a.owner, { aoe: true });
+    if (a.gravity > 0 && !t.dead && !t.isPlayer) { const d = Math.hypot(dx, dz) || 1; knockback(t, -dx / d, -dz / d, 260 + 160 * a.gravity); }
+  }
+}
+function orbHit(a, t) {
+  a.hit.add(t.id);
+  damageEntity(t, a.dmg, a.owner, { aoe: true });
+  sparks(a.x, a.z, a.color, 8, 240);
+  orbBurst(a, t);
+  if (a.chain > 0) chainLightning(a, t);
+  return true;
+}
+function chainLightning(a, from) {
+  const seen = new Set([from.id]); let cur = from;
+  for (let i = 0; i <= a.chain; i++) {                 // stacks + 1 arcs, 55% damage each
+    const nt = findNearestEnemy(cur.x, cur.z, 280, a.owner, seen);
+    if (!nt) break;
+    seen.add(nt.id); spawnBolt(cur.x, cur.z, nt.x, nt.z);
+    damageEntity(nt, a.dmg * 0.55, a.owner, { aoe: true });
+    cur = nt;
+  }
+  if (seen.size > 1) Sound.zap();
+}
+function spawnBolt(x1, z1, x2, z2) {
+  const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz) || 1, m = new THREE.Mesh(G.unitBox, basic(0xbfe6ff));
+  m.scale.set(4.5, 4.5, len); m.position.set((x1 + x2) / 2, 36, (z1 + z2) / 2); m.rotation.y = Math.atan2(dx, dz);
+  scene.add(m); fx.push({ kind: 'bolt', mesh: m, t: 0, life: 0.2, len: len });
+}
+
 function damageEntity(t, amount, src, o) {
   if (t.dead) return;
   if (t.isPlayer && t.invuln > 0) return;
   if (t.st.poison > 0) amount *= 1.2;                       // poison debuff: more damage taken
+  if (t.cls === 'knight') amount *= 0.70;                   // Knight passive: flat 30% damage reduction
   amount = Math.max(1, amount);
   t.hp -= amount; t.flash = 0.11; t.lastAttacker = src;
-  if (src && src.up && src.up.vamp > 0 && !src.dead) healEntity(src, amount * 0.18 * src.up.vamp);
+  if (src && src.up && src.up.vamp > 0 && !src.dead) healEntity(src, amount * VAMP_PER_STACK * src.up.vamp);
   const involvesPlayer = t.isPlayer || (src && src.isPlayer);
   if (t.isPlayer) {
     floatText(t.x, t.z, '-' + Math.round(amount), '#ff6b6b', 22);
@@ -1044,11 +1328,12 @@ function updateStatus(e, dt) {
   if (e.flash > 0) e.flash -= dt;
   if (s.burn > 0) { s.burn -= dt; dot(e, s.burnDps * dt, 'burn'); if (s.burn <= 0) s.burnDps = 0; }
   if (!e.dead && s.poison > 0) { s.poison -= dt; dot(e, s.poisonDps * dt, 'poison'); if (s.poison <= 0) s.poisonDps = 0; }
+  if (!e.dead && s.bleed > 0) { s.bleed -= dt; dot(e, s.bleedDps * dt, 'bleed'); if (s.bleed <= 0) { s.bleedDps = 0; s.bleedSlow = 0; } }
   if (s.frost > 0) { s.frost -= dt; if (s.frost <= 0) s.frostSlow = 0; }
   if (!e.dead && e.dotAcc > 0) {
     e.dotT += dt;
     if (e.dotT >= 0.6) {
-      if (e.dotAcc >= 1 && (e.isPlayer || (e.dotSrc && e.dotSrc.isPlayer))) floatText(e.x, e.z, String(Math.round(e.dotAcc)), e.dotType === 'burn' ? '#ff9a4d' : '#62f08a', 14);
+      if (e.dotAcc >= 1 && (e.isPlayer || (e.dotSrc && e.dotSrc.isPlayer))) floatText(e.x, e.z, String(Math.round(e.dotAcc)), e.dotType === 'burn' ? '#ff9a4d' : (e.dotType === 'bleed' ? '#ff4d6d' : '#62f08a'), 14);
       e.dotAcc = 0; e.dotT = 0;
     }
   }
@@ -1072,7 +1357,7 @@ function killEntity(t, killer) {
 }
 function onPlayerDeath(killer) {
   state = 'dead'; deadTimer = 1.0;
-  killerName = killer ? (killer.isPlayer ? 'yourself' : killer.name + ' (Lv ' + killer.level + ')') : 'the arena';
+  killerName = killer ? (killer.isPlayer ? 'yourself' : killer.name + ' the ' + CLASSES[killer.cls].name + ' (Lv ' + killer.level + ')') : 'the arena';
   deathBurst(player.x, player.z, 0x00cfff, player.scale);
   player.parts.group.visible = false;
   if (player.ui) player.ui.el.style.display = 'none';
@@ -1106,7 +1391,7 @@ function botThink(b) {
   b.target = best;
   if (best) {
     b.los = bestD < 160 || !segBlocked(b.x, b.z, best.x, best.z);
-    b.mode = (b.hp < b.maxHp * 0.28) ? 'flee' : 'engage';
+    b.mode = (b.hp < b.maxHp * (b.cls === 'knight' ? 0.15 : 0.28)) ? 'flee' : 'engage';
   } else { b.los = false; b.mode = 'roam'; }
 }
 function updateBot(b, dt) {
@@ -1131,14 +1416,18 @@ function updateBot(b, dt) {
     if (b.strafeT <= 0) { b.strafeT = rand(1, 2.6); if (Math.random() < 0.5) b.strafeDir = -b.strafeDir; }
     if (b.mode === 'flee') { mx = -nx + sx * 0.4; mz = -nz + sz * 0.4; }
     else if (!b.los) { mx = nx; mz = nz; }
+    else if (b.cls === 'knight') {                    // Rush/Chaser AI: charge straight in, then circle at sword range
+      if (d > b.range * 0.75) { mx = nx + sx * 0.15; mz = nz + sz * 0.15; }
+      else { mx = nx * 0.35 + sx * 0.75; mz = nz * 0.35 + sz * 0.75; }
+    }
     else if (d > b.keepDist + 70) { mx = nx + sx * 0.25; mz = nz + sz * 0.25; }
     else if (d < b.keepDist - 80) { mx = -nx + sx * 0.5; mz = -nz + sz * 0.5; }
     else { mx = sx * 0.8; mz = sz * 0.8; }
-    const lead = clamp(d / CFG.ARROW_SPEED, 0, 0.9) * 0.55;
+    const lead = clamp(d / b.projSpeed, 0, 0.9) * 0.55;
     b.aimTarget = Math.atan2(t.x + t.vx * lead - b.x, t.z + t.vz * lead - b.z) + b.err;
     faceAng = b.aimTarget;
     b.aim += angDiff(b.aim, b.aimTarget) * Math.min(1, dt * 9);
-    if (b.los && d <= b.range && b.cd <= 0 && Math.abs(angDiff(b.aim, b.aimTarget)) < 0.14) {
+    if (b.los && d <= b.range && b.cd <= 0 && Math.abs(angDiff(b.aim, b.aimTarget)) < (b.cls === 'knight' ? 0.6 : 0.14)) {
       fireVolley(b);
       b.cd = b.cooldown * rand(0.9, 1.25) / slowMul(b);
       b.err = rand(-1, 1) * b.accErr;
@@ -1147,10 +1436,11 @@ function updateBot(b, dt) {
   if (faceAng !== null && (!t || b.mode === 'roam')) b.aim += angDiff(b.aim, faceAng) * Math.min(1, dt * 6);
   const ml = Math.hypot(mx, mz);
   if (ml > 1) { mx /= ml; mz /= ml; }
-  const sp = b.speed * slowMul(b) * (b.mode === 'flee' ? 1.1 : 1);
+  const sp = b.speed * slowMul(b) * bleedMul(b) * (b.mode === 'flee' ? 1.1 : 1);
   const k = 1 - Math.exp(-dt * 8);
   b.vx += (mx * sp - b.vx) * k; b.vz += (mz * sp - b.vz) * k;
-  b.x += b.vx * dt; b.z += b.vz * dt;
+  b.x += (b.vx + b.kx) * dt; b.z += (b.vz + b.kz) * dt;   // kx/kz = knockback velocity on top of AI movement
+  if (b.kx || b.kz) { const kd = Math.exp(-5 * dt); b.kx *= kd; b.kz *= kd; if (Math.abs(b.kx) + Math.abs(b.kz) < 5) b.kx = b.kz = 0; }
   resolveCircleWalls(b);
   // push out of the player (the player is never shoved)
   if (!player.dead) {
@@ -1210,7 +1500,7 @@ function pointAround(minR, maxR) {
 const ambientGemValue = () => 2 + Math.floor(player.level / 3);
 
 function updateDropList(list, dt, isGem, st) {
-  const p = player, mg = p.up.magnet, magR = magnetRadius(mg), pull = magnetPull(mg), R2 = CFG.ACTIVE_RADIUS * CFG.ACTIVE_RADIUS;
+  const p = player, mg = p.up.magnet, magR = magnetRadius(mg, p.level), pull = magnetPull(mg), R2 = CFG.ACTIVE_RADIUS * CFG.ACTIVE_RADIUS;
   const pickR = p.r + 22;
   for (let i = list.length - 1; i >= 0; i--) {
     const g = list[i];
@@ -1222,10 +1512,10 @@ function updateDropList(list, dt, isGem, st) {
     }
     let dx = p.x - g.x, dz = p.z - g.z, d2 = dx * dx + dz * dz;
     if (d2 > R2) { scene.remove(g.mesh); list.splice(i, 1); continue; }    // distance culling
-    if (mg > 0) {
-      if (!g.att && d2 < magR * magR) { g.att = true; g.spd = 140; st.fresh++; }
+    if (magR > 0) {                                      // intrinsic base pull is always on; the upgrade only extends it
+      if (!g.att && d2 < magR * magR) { g.att = true; g.spd = 140; if (mg > 0) st.fresh++; }
       if (g.att) {                                       // accelerate straight toward the player until collected
-        st.att++;
+        if (mg > 0) st.att++;                            // magnet chime/hum are reserved for the upgrade
         const d = Math.sqrt(d2) || 1;
         g.spd = Math.min(pull.max, g.spd + pull.accel * dt);
         const step = Math.min(g.spd * dt, d);
@@ -1308,6 +1598,11 @@ function syncThorns() {
     scene.add(thornsGroup);
   }
 }
+function knockback(e, nx, nz, force) {                    // physical impulse on a bot (decays in updateBot)
+  const f = force / Math.max(1, e.scale || 1);
+  e.kx += nx * f; e.kz += nz * f;
+  const m = Math.hypot(e.kx, e.kz); if (m > 800) { e.kx *= 800 / m; e.kz *= 800 / m; }
+}
 function updateThorns(dt) {
   if (!thornsGroup) return;
   const R = thornRadius(player);
@@ -1321,7 +1616,11 @@ function updateThorns(dt) {
   for (const b of bots) {
     if (b.dead) continue;
     const dx = b.x - player.x, dz = b.z - player.z, rr = R + b.r;
-    if (dx * dx + dz * dz < rr * rr) { damageEntity(b, thornDmg(player.up.thorns, player.level), player, { thorns: true }); sparks(b.x, b.z, 0x7dff8a, 4, 160); any = true; }
+    if (dx * dx + dz * dz < rr * rr) {
+      damageEntity(b, thornDmg(player.up.thorns, player.level), player, { thorns: true });
+      if (!b.dead) { const d = Math.sqrt(dx * dx + dz * dz) || 1; knockback(b, dx / d, dz / d, thornKnock(player.up.thorns)); }
+      sparks(b.x, b.z, 0x7dff8a, 4, 160); any = true;
+    }
   }
   if (any) Sound.thorn();
 }
@@ -1361,6 +1660,8 @@ function updateFx(dt) {
       f.vy -= 700 * dt;
       f.mesh.position.x += f.vx * dt; f.mesh.position.z += f.vz * dt; f.mesh.position.y = Math.max(1, f.mesh.position.y + f.vy * dt);
       f.mesh.scale.setScalar(Math.max(0.1, f.s0 * (1 - k)));
+    } else if (f.kind === 'bolt') {
+      const w = 4.5 * (1 - k); f.mesh.scale.set(w, w, f.len);
     } else if (f.kind === 'blast') {
       f.mesh.scale.setScalar(Math.max(1, f.r * (0.25 + 0.75 * k))); f.mat.opacity = 0.55 * (1 - k);
     } else {
@@ -1408,12 +1709,15 @@ function animateEntity(e, dt) {
   P.torso.position.y = 27 + bob; P.head.position.y = 58 + bob * 1.3;
   P.handL.position.y = 31 + bob * 0.5 + Math.sin(clock * 3 + e.id) * 0.8;
   if (e.recoil > 0) e.recoil = Math.max(0, e.recoil - dt * 7);
-  P.handR.position.z = 9 - e.recoil * 9; P.handR.position.y = 31 + Math.sin(clock * 3 + e.id + 1) * 0.8;
+  if (e.cls === 'knight') { const h = Math.min(Math.PI, e.swingHalf || 1.57); P.wpn.rotation.y = e.recoil > 0 ? lerp(h, -h, 1 - e.recoil) : 0.35 + Math.sin(clock * 3 + e.id) * 0.04; }   // sword sweeps across the arc
+  else if (e.cls === 'mage') { P.wpn.rotation.x = e.recoil * 0.8; P.tip.scale.setScalar(1 + e.recoil * 0.6 + Math.sin(clock * 6 + e.id) * 0.08); }   // staff tilts + orb flares on cast
+  else { P.handR.position.z = 9 - e.recoil * 9; P.handR.position.y = 31 + Math.sin(clock * 3 + e.id + 1) * 0.8; }
   // tint: hit flash > burn > poison > frost > spawn protection
   let col = 0, it = 0;
   if (e.flash > 0) { col = 0xffffff; it = 0.85; }
   else if (e.st.burn > 0) { col = 0xff5a1a; it = 0.5 + 0.25 * Math.sin(clock * 18); }
   else if (e.st.poison > 0) { col = 0x39ff6a; it = 0.4; }
+  else if (e.st.bleed > 0) { col = 0xc01838; it = 0.45; }
   else if (e.st.frost > 0) { col = 0x5ad2ff; it = 0.5; }
   else if (e.isPlayer && e.invuln > 0) { col = 0x66e0ff; it = 0.35 + 0.25 * Math.sin(clock * 10); }
   const key = col * 16 + Math.round(it * 10);
@@ -1433,7 +1737,7 @@ function placeBar(e) {
   ui.el.style.transform = 'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) translate(-50%,-100%)';
   const pct = Math.max(0, e.hp / e.maxHp * 100);
   if (Math.abs(pct - ui.pct) > 0.2) { ui.pct = pct; ui.fl.style.width = pct + '%'; }
-  const st = (e.st.burn > 0 ? '🔥' : '') + (e.st.frost > 0 ? '❄️' : '') + (e.st.poison > 0 ? '☠️' : '');
+  const st = (e.st.burn > 0 ? '🔥' : '') + (e.st.frost > 0 ? '❄️' : '') + (e.st.poison > 0 ? '☠️' : '') + (e.st.bleed > 0 ? '🩸' : '');
   if (st !== ui.st) { ui.st = st; ui.sti.textContent = st; }
   if (!e.isPlayer) {
     const cls = e.level > player.level + 1 ? 'lv danger' : (e.level < player.level - 1 ? 'lv easy' : 'lv');
@@ -1515,7 +1819,7 @@ function updatePlayer(dt) {
   if (keys.KeyD || keys.ArrowRight) ix += 1;
   if (touch.move.on) { ix += touch.move.x; iz += touch.move.z; }
   const il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; }
-  const sp = p.speed * slowMul(p), k = 1 - Math.exp(-dt * 14);
+  const sp = p.speed * slowMul(p) * bleedMul(p), k = 1 - Math.exp(-dt * 14);
   p.vx += (ix * sp - p.vx) * k; p.vz += (iz * sp - p.vz) * k;
   p.x += p.vx * dt; p.z += p.vz * dt;
   resolveCircleWalls(p);
@@ -1576,7 +1880,7 @@ function showOnly(el) {
 function openLevelUp() {
   state = 'levelup'; mouse.down = false;
   for (const k in keys) keys[k] = false;
-  const eligible = UP_KEYS.filter((k) => player.up[k] < UPGRADES[k].max);
+  const eligible = UP_KEYS.filter((k) => classOK(k, player.cls) && canTake(player.up, k, upMax(k, player.cls)));   // class pool + exclusive groups + per-class caps
   if (!eligible.length) { player.hp = player.maxHp; levelPending = 0; state = 'playing'; return; }
   const choices = [];
   while (choices.length < 3 && eligible.length) choices.push(eligible.splice(Math.floor(Math.random() * eligible.length), 1)[0]);
@@ -1585,9 +1889,11 @@ function openLevelUp() {
     const D = UPGRADES[k], cur = player.up[k];
     const card = document.createElement('button');
     card.className = 'card cat-' + D.cat;
+    const g = EXCL_OF[k];
+    const note = g ? '<div class="lock' + (cur > 0 ? ' on' : '') + '">' + (cur > 0 ? '✔ ' + g.label + ' specialization' : '🔒 Locks the other ' + (g.keys.length - 1) + ' ' + g.label) + '</div>' : '';
     let pips = '';
-    for (let n = 0; n < D.max; n++) pips += '<i class="pip ' + (n < cur ? 'on' : (n === cur ? 'next' : '')) + '"></i>';
-    card.innerHTML = '<span class="hot">' + (i + 1) + '</span><span class="cat">' + D.cat + '</span><div class="icon">' + D.icon + '</div><h3>' + esc(D.name) + '</h3><p>' + esc(D.desc(cur)) + '</p><div class="pips">' + pips + '</div>';
+    for (let n = 0, mx = upMax(k, player.cls); n < mx; n++) pips += '<i class="pip ' + (n < cur ? 'on' : (n === cur ? 'next' : '')) + '"></i>';
+    card.innerHTML = '<span class="hot">' + (i + 1) + '</span><span class="cat">' + D.cat + '</span><div class="icon">' + D.icon + '</div><h3>' + esc(D.name) + '</h3><p>' + esc(D.desc(cur, player.cls)) + '</p>' + note + '<div class="pips">' + pips + '</div>';
     card.addEventListener('click', () => chooseUpgrade(k));
     U.cards.appendChild(card);
   });
@@ -1597,7 +1903,7 @@ function openLevelUp() {
   const first = U.cards.firstElementChild; if (first) first.focus({ preventScroll: true });
 }
 function chooseUpgrade(k) {
-  if (state !== 'levelup') return;
+  if (state !== 'levelup' || !classOK(k, player.cls) || !canTake(player.up, k, upMax(k, player.cls))) return;
   Sound.click();
   player.up[k]++;
   recalcPlayer(); syncShields(); syncThorns();
@@ -1625,16 +1931,17 @@ function clearWorld() {
   chunks.clear(); walls = [];
   for (const f of fx) { scene.remove(f.mesh); if (f.mat) f.mat.dispose(); } fx = [];
   for (const s of shields) scene.remove(s.mesh); shields = [];
+  for (const s of swings) { scene.remove(s.mesh); s.mat.dispose(); } swings = [];
   if (thornsGroup) { scene.remove(thornsGroup); thornsGroup = null; }
   if (player) scene.remove(player.parts.group);
   pending.length = 0; floaters = [];
   worldUi.innerHTML = ''; U.feed.innerHTML = '';
 }
-function resetGame(name) {
+function resetGame(name, heroClass) {
   clearWorld();
   clock = 0; levelPending = 0; shake = 0; thornTick = 0; chunkT = 0; ambT = 0; boardT = 0; hudDirty = true; killerName = '';
   Sound.setHum(0);
-  createPlayer(name);
+  createPlayer(name, heroClass);
   camFocus.x = 0; camFocus.z = 0;
   computeView();
   updateChunks();
@@ -1648,7 +1955,7 @@ function buildEnts() { ents.length = 0; if (!player.dead) ents.push(player); for
 function startGame() {
   Sound.init(); Sound.resume();
   const nm = ($('name-input').value || '').trim().slice(0, 14) || 'You';
-  resetGame(nm);
+  resetGame(nm, pickedClass);
   showOnly(null);
   U.hud.classList.remove('hidden');
   U.tip.style.opacity = 1; tipT = 7;
@@ -1671,6 +1978,7 @@ function update(dt) {
   separateBots();
   for (const b of bots) if (!b.dead) resolveCircleWalls(b);
   updateArrows(dt);
+  updateSwings(dt);
   for (const e of ents) updateStatus(e, dt);
   if (alive && !player.dead) { updateShields(dt); updateThorns(dt); updateDrops(dt); }
   // clean up the dead; spawn replacements right away so the arena stays at 25-30 bots
@@ -1765,10 +2073,29 @@ $('btn-resume').addEventListener('click', () => { Sound.click(); togglePause(); 
 $('btn-restart').addEventListener('click', () => { Sound.resume(); startGame(); });
 $('btn-pause').addEventListener('click', () => { Sound.click(); togglePause(); });
 $('btn-sound').addEventListener('click', toggleMute);
+
+// Hero class picker + "Change hero" (returns to the start screen with a fresh arena)
+const clsCards = Array.prototype.slice.call(document.querySelectorAll('.cls-card'));
+function heroName() { return ($('name-input').value || '').trim().slice(0, 14) || 'You'; }
+function pickClass(k) {
+  pickedClass = k;
+  clsCards.forEach((c) => c.setAttribute('aria-pressed', c.dataset.cls === k ? 'true' : 'false'));
+  if (state === 'menu') resetGame(heroName(), k);      // live 3D preview of the chosen hero behind the menu
+}
+clsCards.forEach((c) => c.addEventListener('click', () => { Sound.init(); Sound.resume(); Sound.click(); if (c.dataset.cls !== pickedClass) pickClass(c.dataset.cls); }));
+function toMenu() {
+  Sound.init(); Sound.resume(); Sound.click();
+  resetGame(heroName(), pickedClass);
+  state = 'menu'; mouse.down = false;
+  U.hud.classList.add('hidden'); U.vig.style.opacity = 0;
+  showOnly(U.start);
+}
+$('btn-hero-p').addEventListener('click', toMenu);
+$('btn-hero-o').addEventListener('click', toMenu);
 if (!('ontouchstart' in window)) $('touch-hint').classList.add('hidden');
 
 // Boot: build a live arena behind the start screen, then wait for Play.
-resetGame('You');
+resetGame('You', pickedClass);
 onResize();
 requestAnimationFrame(frame);
 })();
