@@ -161,6 +161,13 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
   #board-wrap { padding: 6px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .card, .kf { animation: none; } .btn, .card, .cls-card { transition: none; } }
+.mp-seg{display:flex;gap:8px;justify-content:center;margin:6px 0 10px}
+#mp-panel{margin:0 auto 10px;max-width:520px;text-align:center}
+#mp-panel .row{display:flex;justify-content:center;gap:10px;margin:8px 0}
+#mp-token{font:800 34px/1.2 monospace;letter-spacing:.35em;color:#ffcf5a;background:rgba(255,255,255,.07);border:1px dashed rgba(255,207,90,.6);border-radius:12px;padding:8px 18px 8px 26px;display:inline-block;user-select:all}
+#mp-target{width:160px;text-align:center;letter-spacing:.3em;font-weight:800;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,30,.6);color:#fff;font-size:18px;outline:none}
+#mp-status{font-size:14px;min-height:20px;margin:6px 0 0}
+#mp-panel.hidden,#mp-host-box.hidden,#mp-join-box.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -227,6 +234,13 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
     <path d="M18 13 L4 3 M18 13 L4 23 M34 13 L20 3 M34 13 L20 23" stroke="#ff6b4a" stroke-width="4" stroke-linecap="round"/>
   </svg>
   <p class="lead">An endless arena with 28 rival heroes. Pick a class, loot gems, level up, and stack upgrades until your build is a problem for everyone else.</p>
+  <div class="mp-seg" role="group" aria-label="Game mode"><button class="btn" id="m-solo">Solo</button><button class="btn ghost" id="m-multi">Multiplayer</button></div>
+  <div id="mp-panel" class="hidden">
+    <div class="row"><button class="btn ghost" id="mp-host">Host Game</button><button class="btn ghost" id="mp-join">Join Game</button></div>
+    <div id="mp-host-box" class="hidden"><p class="lead" style="font-size:14px">Share this token with your friend:</p><div id="mp-token">------</div></div>
+    <div id="mp-join-box" class="row hidden"><input id="mp-target" maxlength="6" placeholder="TOKEN" autocomplete="off" spellcheck="false" aria-label="Host token"><button class="btn" id="mp-connect">Connect</button></div>
+    <p class="lead" id="mp-status"></p>
+  </div>
   <div class="row">
     <input id="name-input" maxlength="14" placeholder="Your nickname" autocomplete="off" spellcheck="false" aria-label="Nickname">
     <button class="btn" id="btn-play">Play</button>
@@ -311,6 +325,7 @@ kbd { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 7
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
 (function () {
 'use strict';
@@ -670,6 +685,10 @@ let clock = 0, nextId = 1, levelPending = 0, shake = 0, deadTimer = 0, killerNam
 let thornsGroup = null, thornTick = 0, chunkT = 0, ambT = 0, boardT = 0, hudDirty = true, tipT = 0;
 const camFocus = { x: 0, z: 0 };
 const view = { maxR: 900 };
+let gameMode = 'solo', menuMode = 'solo', players = [], peer = null, conn = null, remoteP = null, myId = 0, slowT = 0;
+const ARENA = 2400;
+const inArena = (x, z, m) => Math.abs(x) < ARENA - (m || 0) && Math.abs(z) < ARENA - (m || 0);
+function generateShortId() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
 const BOT_NAMES = ['Zephyr', 'Nova', 'Blaze', 'Kiko', 'Orion', 'Luna', 'Rex', 'Mira', 'Tako', 'Vex', 'Pip', 'Juno', 'Axel', 'Sable', 'Yuki', 'Bolt', 'Echo', 'Fang', 'Gizmo', 'Hex', 'Indy', 'Jett', 'Koda', 'Lynx', 'Moxie', 'Nyx', 'Onyx', 'Pixel', 'Quill', 'Rune', 'Sol', 'Tux', 'Umbra', 'Vega', 'Wisp', 'Xeno', 'Yoyo', 'Zed', 'Ash', 'Brio'];
 const TIERS = [
@@ -747,8 +766,8 @@ function createPlayer(name, heroClass) {
   return p;
 }
 
-function recalcPlayer() {
-  const p = player, u = p.up, C = CLASSES[p.cls];
+function recalcPlayer(pp) {
+  const p = pp || player, u = p.up, C = CLASSES[p.cls];
   p.scale = 1 + Math.min(0.5, (p.level - 1) * 0.02);
   p.r = 22 * p.scale;
   p.parts.group.scale.setScalar(p.scale);
@@ -794,7 +813,7 @@ function computeView() {
 
 function spawnBot(initial) {
   // EXPLICIT SCALING: bot level is derived from the player's current level.
-  let botLevel = Math.max(1, player.level + Math.floor(Math.random() * 5) - 2);
+  const A = anchorPlayer(); let botLevel = Math.max(1, A.level + Math.floor(Math.random() * 5) - 2);
   const tier = Math.min(TIERS.length - 1, Math.floor((botLevel - 1) / 3));
   const T = TIERS[tier];
   const scale = 1 + Math.min(0.85, (botLevel - 1) * 0.04);
@@ -825,7 +844,7 @@ function spawnBot(initial) {
   do {
     const a = Math.random() * TAU;
     const rad = initial ? rand(480, 1400) : rand(view.maxR + 70, view.maxR + 380);
-    x = player.x + Math.sin(a) * rad; z = player.z + Math.cos(a) * rad; tries++;
+    x = A.x + Math.sin(a) * rad; z = A.z + Math.cos(a) * rad; if (gameMode !== 'solo') { x = clamp(x, -ARENA + 90, ARENA - 90); z = clamp(z, -ARENA + 90, ARENA - 90); } tries++;
   } while (tries < 8 && insideAnyWall(x, z, b.r + 12));
   b.x = x; b.z = z; b.px = x; b.pz = z; b.aim = Math.random() * TAU;
   b.parts.group.position.set(x, 0, z);
@@ -1076,7 +1095,7 @@ function updateArrows(dt) {
     a.x += a.vx * dt; a.z += a.vz * dt; a.life -= dt;
     if (a.life <= 0) { dead = true; if (a.orb) orbBurst(a, null); }
     const ddx = a.x - player.x, ddz = a.z - player.z;
-    if (ddx * ddx + ddz * ddz > R2) dead = true;          // distance culling
+    if (gameMode === 'solo' ? ddx * ddx + ddz * ddz > R2 : !inArena(a.x, a.z, 0)) dead = true;          // distance culling
     if (!dead) {                                           // walls
       for (let j = 0; j < walls.length; j++) {
         const w = walls[j];
@@ -1342,7 +1361,7 @@ function updateStatus(e, dt) {
 function killEntity(t, killer) {
   if (t.dead) return;
   t.dead = true; t.hp = 0;
-  if (t.isPlayer) { onPlayerDeath(killer); return; }
+  if (t.isPlayer) { if (t === player) onPlayerDeath(killer); else onRemoteDeath(t, killer); return; }
   deathBurst(t.x, t.z, TIERS[t.tier].body, t.scale);
   destroyBotVisuals(t);
   const n = 4 + Math.floor(t.level / 3), val = 3 + Math.floor(t.level * 0.8);
@@ -1350,14 +1369,15 @@ function killEntity(t, killer) {
   if (Math.random() < 0.30) spawnHeart(t.x + rand(-20, 20), t.z + rand(-20, 20), true);   // 30% red health drop
   if (killer && killer !== t) {
     killer.kills++; killer.score += 50 + t.level * 10;
-    if (killer.isPlayer) { killFeed('You eliminated <b>' + esc(t.name) + '</b>'); hudDirty = true; }
+    if (killer === player) { killFeed('You eliminated <b>' + esc(t.name) + '</b>'); hudDirty = true; }
+    else if (killer.isPlayer) killFeed(esc(killer.name) + ' eliminated <b>' + esc(t.name) + '</b>');
     else if (Math.hypot(t.x - player.x, t.z - player.z) < view.maxR + 200) killFeed(esc(killer.name) + ' eliminated <b>' + esc(t.name) + '</b>');
   }
   if (Math.hypot(t.x - player.x, t.z - player.z) < 900) Sound.explode();
 }
 function onPlayerDeath(killer) {
   state = 'dead'; deadTimer = 1.0;
-  killerName = killer ? (killer.isPlayer ? 'yourself' : killer.name + ' the ' + CLASSES[killer.cls].name + ' (Lv ' + killer.level + ')') : 'the arena';
+  killerName = killer ? (killer === player ? 'yourself' : killer.name + ' the ' + CLASSES[killer.cls].name + ' (Lv ' + killer.level + ')') : 'the arena';
   deathBurst(player.x, player.z, 0x00cfff, player.scale);
   player.parts.group.visible = false;
   if (player.ui) player.ui.el.style.display = 'none';
@@ -1369,14 +1389,15 @@ function onPlayerDeath(killer) {
    BOT AI
    ===================================================================== */
 function pickWander(b) {
-  const dp = Math.hypot(player.x - b.x, player.z - b.z);
-  if (!player.dead && (dp > 1100 || Math.random() < 0.25)) {
+  const np = nearestPlayer(b.x, b.z), dp = Math.hypot(np.x - b.x, np.z - b.z);
+  if (!np.dead && (dp > 1100 || Math.random() < 0.25)) {
     const a = Math.random() * TAU, r = rand(250, 700);
-    b.wx = player.x + Math.sin(a) * r; b.wz = player.z + Math.cos(a) * r;
+    b.wx = np.x + Math.sin(a) * r; b.wz = np.z + Math.cos(a) * r;
   } else {
     const a = Math.random() * TAU, r = rand(150, 500);
     b.wx = b.x + Math.sin(a) * r; b.wz = b.z + Math.cos(a) * r;
   }
+  if (gameMode !== 'solo') { b.wx = clamp(b.wx, -ARENA + 120, ARENA - 120); b.wz = clamp(b.wz, -ARENA + 120, ARENA - 120); }
   b.wanderT = rand(3, 7);
 }
 function botThink(b) {
@@ -1443,9 +1464,9 @@ function updateBot(b, dt) {
   if (b.kx || b.kz) { const kd = Math.exp(-5 * dt); b.kx *= kd; b.kz *= kd; if (Math.abs(b.kx) + Math.abs(b.kz) < 5) b.kx = b.kz = 0; }
   resolveCircleWalls(b);
   // push out of the player (the player is never shoved)
-  if (!player.dead) {
-    const dx = b.x - player.x, dz = b.z - player.z, rr = b.r + player.r, d2 = dx * dx + dz * dz;
-    if (d2 < rr * rr && d2 > 1e-4) { const d = Math.sqrt(d2); b.x = player.x + dx / d * rr; b.z = player.z + dz / d * rr; }
+  for (const P of players) if (!P.dead) {
+    const dx = b.x - P.x, dz = b.z - P.z, rr = b.r + P.r, d2 = dx * dx + dz * dz;
+    if (d2 < rr * rr && d2 > 1e-4) { const d = Math.sqrt(d2); b.x = P.x + dx / d * rr; b.z = P.z + dz / d * rr; }
   }
   // stuck detection (corners of L-shaped cover)
   const moved = Math.hypot(b.x - b.px, b.z - b.pz); b.px = b.x; b.pz = b.z;
@@ -1492,7 +1513,7 @@ function pointAround(minR, maxR) {
   let x = 0, z = 0;
   for (let i = 0; i < 6; i++) {
     const a = Math.random() * TAU, r = rand(minR, maxR);
-    x = player.x + Math.sin(a) * r; z = player.z + Math.cos(a) * r;
+    const c = anchorPlayer(); x = c.x + Math.sin(a) * r; z = c.z + Math.cos(a) * r; if (gameMode !== 'solo') { x = clamp(x, -ARENA + 80, ARENA - 80); z = clamp(z, -ARENA + 80, ARENA - 80); }
     if (!insideAnyWall(x, z, 30)) break;
   }
   return { x: x, z: z };
@@ -1511,7 +1532,7 @@ function updateDropList(list, dt, isGem, st) {
       if (Math.abs(g.bvx) + Math.abs(g.bvz) < 4) g.bvx = g.bvz = 0;
     }
     let dx = p.x - g.x, dz = p.z - g.z, d2 = dx * dx + dz * dz;
-    if (d2 > R2) { scene.remove(g.mesh); list.splice(i, 1); continue; }    // distance culling
+    if (gameMode === 'solo' ? d2 > R2 : !inArena(g.x, g.z, 0)) { scene.remove(g.mesh); list.splice(i, 1); continue; }    // distance culling
     if (magR > 0) {                                      // intrinsic base pull is always on; the upgrade only extends it
       if (!g.att && d2 < magR * magR) { g.att = true; g.spd = 140; if (mg > 0) st.fresh++; }
       if (g.att) {                                       // accelerate straight toward the player until collected
@@ -1542,23 +1563,25 @@ function updateDrops(dt) {
 }
 function maintainPickups(dt) {
   ambT -= dt; if (ambT > 0) return; ambT = 0.3;
-  let nearG = 0, nearH = 0; const r2 = 1500 * 1500;
+  let nearG = 0, nearH = 0; const r2 = gameMode === 'solo' ? 1500 * 1500 : 1e12;
   for (const g of gems) { const dx = g.x - player.x, dz = g.z - player.z; if (dx * dx + dz * dz < r2) nearG++; }
   for (const h of hearts) { const dx = h.x - player.x, dz = h.z - player.z; if (dx * dx + dz * dz < r2) nearH++; }
   let guard = 0;
-  while (nearG < CFG.GEM_TARGET && guard++ < 3) { const pt = pointAround(view.maxR * 0.75, 1450), n = randi(3, 6); spawnGemClump(pt.x, pt.z, n, ambientGemValue()); nearG += n; }
-  if (nearH < CFG.HEART_TARGET && Math.random() < 0.5) { const pt = pointAround(view.maxR * 0.9, 1450); spawnHeart(pt.x, pt.z, false); }
+  while (nearG < CFG.GEM_TARGET * (gameMode === 'solo' ? 1 : 2) && guard++ < 3) { const pt = pointAround(view.maxR * 0.75, 1450), n = randi(3, 6); spawnGemClump(pt.x, pt.z, n, ambientGemValue()); nearG += n; }
+  if (nearH < CFG.HEART_TARGET * (gameMode === 'solo' ? 1 : 2) && Math.random() < 0.5) { const pt = pointAround(view.maxR * 0.9, 1450); spawnHeart(pt.x, pt.z, false); }
 }
-function addExp(v) {
-  if (player.dead) return;
-  player.exp += v; player.totalExp += v;
-  while (player.exp >= player.expNeed) {
-    player.exp -= player.expNeed; player.level++; player.expNeed = expFor(player.level); levelPending++;
-    recalcPlayer();
-    player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
-    player.ui.lv.textContent = 'Lv ' + player.level;
-    floatText(player.x, player.z, 'LEVEL UP!', '#ffd24d', 26, 110);
-    sparks(player.x, player.z, 0xffd24d, 14, 320, 40);
+function addExp(v, who) {
+  const P = who || player;
+  if (P.dead) return;
+  P.exp += v; P.totalExp += v;
+  while (P.exp >= P.expNeed) {
+    P.exp -= P.expNeed; P.level++; P.expNeed = expFor(P.level);
+    if (P === player) levelPending++; else P.pend = (P.pend || 0) + 1;
+    recalcPlayer(P);
+    P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.25);
+    P.ui.lv.textContent = 'Lv ' + P.level;
+    floatText(P.x, P.z, 'LEVEL UP!', '#ffd24d', 26, 110);
+    sparks(P.x, P.z, 0xffd24d, 14, 320, 40);
   }
 }
 
@@ -1755,7 +1778,7 @@ const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), aimPoint = n
 const aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -30);
 
 window.addEventListener('keydown', (e) => {
-  if (e.target && e.target.tagName === 'INPUT') { if (e.code === 'Enter' && state === 'menu') startGame(); return; }
+  if (e.target && e.target.tagName === 'INPUT') { if (e.code === 'Enter' && state === 'menu') { if (e.target.id === 'mp-target') $('mp-connect').click(); else if (menuMode === 'solo') startGame(); } return; }
   const k = e.code;
   if (k === 'Escape' || k === 'KeyP') { e.preventDefault(); if (!e.repeat) togglePause(); return; }
   if (k === 'KeyM') { toggleMute(); return; }
@@ -1864,7 +1887,7 @@ function updateHud() {
   }
 }
 function updateBoard() {
-  const all = [player].concat(bots).sort((a, b) => b.score - a.score);
+  const all = players.concat(bots).sort((a, b) => b.score - a.score);
   const rank = all.indexOf(player);
   const row = (e, i) => '<li class="' + (e === player ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(e.name) + '</span><span class="sc">' + Math.floor(e.score) + '</span></li>';
   let h = '';
@@ -1880,7 +1903,7 @@ function showOnly(el) {
 function openLevelUp() {
   state = 'levelup'; mouse.down = false;
   for (const k in keys) keys[k] = false;
-  const eligible = UP_KEYS.filter((k) => classOK(k, player.cls) && canTake(player.up, k, upMax(k, player.cls)));   // class pool + exclusive groups + per-class caps
+  const eligible = UP_KEYS.filter((k) => classOK(k, player.cls) && canTake(player.up, k, upMax(k, player.cls)) && !(gameMode === 'client' && (k === 'shield' || k === 'thorns')));   // class pool + exclusive groups + per-class caps
   if (!eligible.length) { player.hp = player.maxHp; levelPending = 0; state = 'playing'; return; }
   const choices = [];
   while (choices.length < 3 && eligible.length) choices.push(eligible.splice(Math.floor(Math.random() * eligible.length), 1)[0]);
@@ -1905,6 +1928,7 @@ function openLevelUp() {
 function chooseUpgrade(k) {
   if (state !== 'levelup' || !classOK(k, player.cls) || !canTake(player.up, k, upMax(k, player.cls))) return;
   Sound.click();
+  if (gameMode === 'client') { if (conn && conn.open) conn.send({ c: k }); lvBlock = performance.now() + 700; }
   player.up[k]++;
   recalcPlayer(); syncShields(); syncThorns();
   hudDirty = true;
@@ -1913,6 +1937,7 @@ function chooseUpgrade(k) {
   else { showOnly(null); state = 'playing'; }
 }
 function togglePause() {
+  if (gameMode !== 'solo') return;
   if (state === 'playing') { state = 'paused'; mouse.down = false; showOnly(U.pause); Sound.suspend(); }
   else if (state === 'paused') { state = 'playing'; showOnly(null); Sound.resume(); }
 }
@@ -1928,34 +1953,39 @@ function clearWorld() {
   for (const g of gems) scene.remove(g.mesh); gems = [];
   for (const h of hearts) scene.remove(h.mesh); hearts = [];
   for (const entry of chunks) removeChunk(entry[1]);
-  chunks.clear(); walls = [];
+  chunks.clear(); for (const w of walls) scene.remove(w.mesh); walls = [];
   for (const f of fx) { scene.remove(f.mesh); if (f.mat) f.mat.dispose(); } fx = [];
   for (const s of shields) scene.remove(s.mesh); shields = [];
   for (const s of swings) { scene.remove(s.mesh); s.mat.dispose(); } swings = [];
   if (thornsGroup) { scene.remove(thornsGroup); thornsGroup = null; }
   if (player) scene.remove(player.parts.group);
   pending.length = 0; floaters = [];
+  for (const m of cArrows.concat(cGems, cHearts)) scene.remove(m);
+  cArrows.length = cGems.length = cHearts.length = 0; views.clear(); players = []; remoteP = null;
   worldUi.innerHTML = ''; U.feed.innerHTML = '';
 }
 function resetGame(name, heroClass) {
   clearWorld();
   clock = 0; levelPending = 0; shake = 0; thornTick = 0; chunkT = 0; ambT = 0; boardT = 0; hudDirty = true; killerName = '';
   Sound.setHum(0);
-  createPlayer(name, heroClass);
+  createPlayer(name, heroClass); players = [player];
+  if (gameMode !== 'solo') { player.x = -250; player.z = 0; }
   camFocus.x = 0; camFocus.z = 0;
   computeView();
-  updateChunks();
+  if (gameMode === 'solo') updateChunks(); else buildArena();
   while (bots.length < CFG.BOT_TARGET) spawnBot(true);
   for (let i = 0; i < 16; i++) { const pt = pointAround(120, 1400); spawnGemClump(pt.x, pt.z, randi(3, 6), ambientGemValue()); }
   for (let i = 0; i < 5; i++) { const pt = pointAround(250, 1400); spawnHeart(pt.x, pt.z, false); }
   buildEnts();
 }
-function buildEnts() { ents.length = 0; if (!player.dead) ents.push(player); for (const b of bots) if (!b.dead) ents.push(b); }
+function buildEnts() { ents.length = 0; for (const p of players) if (!p.dead) ents.push(p); for (const b of bots) if (!b.dead) ents.push(b); }
 
 function startGame() {
+  if (gameMode === 'client') { if (conn && conn.open) conn.send({ r: 1 }); return; }
   Sound.init(); Sound.resume();
   const nm = ($('name-input').value || '').trim().slice(0, 14) || 'You';
   resetGame(nm, pickedClass);
+  if (gameMode === 'host' && conn && remoteInfo) { createRemote(remoteInfo); conn.send({ i: remoteP.id }); }
   showOnly(null);
   U.hud.classList.remove('hidden');
   U.tip.style.opacity = 1; tipT = 7;
@@ -1969,9 +1999,11 @@ function gameOver() {
 }
 
 function update(dt) {
+  if (gameMode === 'client') { clientUpdate(dt); return; }
   clock += dt;
   const alive = !player.dead;
   if (alive) { player.t += dt; updatePlayer(dt); }
+  if (remoteP && !remoteP.dead) updateRemote(remoteP, dt);
   buildEnts();
   processPending(dt);
   for (const b of bots) updateBot(b, dt);
@@ -1981,23 +2013,26 @@ function update(dt) {
   updateSwings(dt);
   for (const e of ents) updateStatus(e, dt);
   if (alive && !player.dead) { updateShields(dt); updateThorns(dt); updateDrops(dt); }
+  if (remoteP && !remoteP.dead) remoteDrops(remoteP, dt);
   // clean up the dead; spawn replacements right away so the arena stays at 25-30 bots
   if (bots.some((b) => b.dead)) bots = bots.filter((b) => !b.dead);
   // distance culling for bots (they are replaced just outside the camera view)
   const R2 = CFG.ACTIVE_RADIUS * CFG.ACTIVE_RADIUS;
   for (let i = bots.length - 1; i >= 0; i--) {
     const b = bots[i], dx = b.x - player.x, dz = b.z - player.z;
-    if (dx * dx + dz * dz > R2) { destroyBotVisuals(b); bots.splice(i, 1); }
+    if (gameMode === 'solo' ? dx * dx + dz * dz > R2 : !inArena(b.x, b.z, 0)) { destroyBotVisuals(b); bots.splice(i, 1); }
   }
   while (bots.length < CFG.BOT_TARGET) spawnBot(false);
-  chunkT -= dt; if (chunkT <= 0) { chunkT = 0.25; updateChunks(); }
+  if (gameMode === 'solo') { chunkT -= dt; if (chunkT <= 0) { chunkT = 0.25; updateChunks(); } }
   maintainPickups(dt);
   buildEnts();
   // visuals
   if (!player.dead) animateEntity(player, dt);
+  for (const p of players) if (p !== player && !p.dead) animateEntity(p, dt);
   for (const b of bots) animateEntity(b, dt);
   updateFx(dt);
   followCamera(dt);
+  if (gameMode === 'host') hostSend(dt);
   if (levelPending > 0 && state === 'playing') openLevelUp();
   if (state === 'dead') { deadTimer -= dt; if (deadTimer <= 0 && U.over.classList.contains('hidden')) gameOver(); }
 }
@@ -2032,9 +2067,10 @@ function menuUpdate(dt) {
 }
 function uiFrame(dt) {
   if (player && !player.dead) placeBar(player);
+  for (const p of players) if (p !== player && !p.dead) placeBar(p);
   for (const b of bots) if (!b.dead) placeBar(b);
   updateFloaters(dt);
-  if (state === 'playing' || state === 'dead') {
+  if ((state === 'playing' || state === 'dead') && player) {
     updateHud();
     boardT -= dt; if (boardT <= 0) { boardT = 0.35; updateBoard(); }
     if (tipT > 0) { tipT -= dt; if (tipT <= 0) U.tip.style.opacity = 0; }
@@ -2045,15 +2081,289 @@ function uiFrame(dt) {
   }
 }
 
+/* =====================================================================
+   MULTIPLAYER (PeerJS): host runs the whole sim, client sends inputs and renders the host's state
+   ===================================================================== */
+let remoteInfo = null, lvBlock = 0, lastAim = 0;
+const views = new Map(), sentMeta = new Set(), cArrows = [], cGems = [], cHearts = [];
+const r1 = (v) => Math.round(v * 10) / 10;
+const mpUI = { panel: $('mp-panel'), hostBox: $('mp-host-box'), joinBox: $('mp-join-box'), token: $('mp-token'), status: $('mp-status') };
+
+function anchorPlayer() { const a = players.filter((p) => !p.dead); return a.length ? a[Math.floor(Math.random() * a.length)] : player; }
+function nearestPlayer(x, z) {
+  let best = null, bd = Infinity;
+  for (const p of players) { if (p.dead) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } }
+  return best || player;
+}
+function spawnPoint() {
+  for (let i = 0; i < 12; i++) { const x = rand(-ARENA + 300, ARENA - 300), z = rand(-ARENA + 300, ARENA - 300); if (!insideAnyWall(x, z, 40)) return { x: x, z: z }; }
+  return { x: 250, z: 0 };
+}
+
+/* ---- static bounded arena: same WALL_MATS + G.unitBox wall objects as genChunk ---- */
+function buildArena() {
+  const rng = mulberry32(0xA11E5);
+  const add = (x, z, w, d, h, fam) => {
+    const mesh = new THREE.Mesh(G.unitBox, WALL_MATS[fam]);
+    mesh.scale.set(w, h, d); mesh.position.set(x, h / 2, z); mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+    walls.push({ x: x, z: z, hw: w / 2, hd: d / 2, mesh: mesh, chunk: null });
+  };
+  const T = 120, H = 150, L = ARENA * 2 + T * 2;
+  add(0, -ARENA - T / 2, L, T, H, 0); add(0, ARENA + T / 2, L, T, H, 0);
+  add(-ARENA - T / 2, 0, T, L, H, 0); add(ARENA + T / 2, 0, T, L, H, 0);
+  for (let i = 0; i < 90; i++) {
+    const x = (rng() * 2 - 1) * (ARENA - 260), z = (rng() * 2 - 1) * (ARENA - 260), k = rng();
+    if (Math.hypot(x, z) < 380) continue;
+    if (k < 0.45) add(x, z, 80, 80, 110, 1); else if (k < 0.75) add(x, z, 300, 40, 72, 2); else add(x, z, 40, 300, 72, 2);
+  }
+}
+
+/* ---- host side: remote player entity, input application, state broadcast ---- */
+function createRemote(info) {
+  const p = newEntity({ isPlayer: true, remote: true, name: info.name, level: 1, hp: 0, maxHp: 0, cls: CLASSES[info.cls] ? info.cls : 'archer' });
+  p.parts = makeCharacter(0xff9d4d, 0xffe2c4, 0xffffff, p.cls);
+  p.exp = 0; p.totalExp = 0; p.expNeed = expFor(1); p.t = 0; p.invuln = 3.2; p.pend = 0;
+  p.bubble = new THREE.Mesh(G.bubble, MAT.bubble); p.bubble.position.y = 34; p.parts.group.add(p.bubble);
+  scene.add(p.parts.group);
+  recalcPlayer(p); p.hp = p.maxHp;
+  p.ui = makeHpBar(p, '');
+  p.inp = { x: 0, z: 0, a: 0, f: false };
+  const sp = spawnPoint(); p.x = sp.x; p.z = sp.z;
+  players.push(p); remoteP = p;
+  return p;
+}
+function removeRemote() {
+  if (!remoteP) return;
+  scene.remove(remoteP.parts.group); if (remoteP.ui) remoteP.ui.el.remove();
+  remoteP.dead = true; players = players.filter((p) => p !== remoteP); remoteP = null;
+}
+function updateRemote(p, dt) {
+  const i = p.inp;
+  let ix = clamp(+i.x || 0, -1, 1), iz = clamp(+i.z || 0, -1, 1);
+  const il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; }
+  const sp = p.speed * slowMul(p) * bleedMul(p), k = 1 - Math.exp(-dt * 14);
+  p.vx += (ix * sp - p.vx) * k; p.vz += (iz * sp - p.vz) * k;
+  p.x += p.vx * dt; p.z += p.vz * dt;
+  resolveCircleWalls(p);
+  p.aim += angDiff(p.aim, +i.a || 0) * Math.min(1, dt * 22);
+  p.cd -= dt; p.t += dt; if (p.invuln > 0) p.invuln -= dt;
+  if (i.f && p.cd <= 0) { fireVolley(p); p.cd = p.cooldown; }
+}
+function remoteDrops(p, dt) {
+  const magR = magnetRadius(p.up.magnet, p.level), pickR = p.r + 22;
+  for (const list of [gems, hearts]) for (let i = list.length - 1; i >= 0; i--) {
+    const g = list[i], dx = p.x - g.x, dz = p.z - g.z, d2 = dx * dx + dz * dz;
+    if (d2 < magR * magR) { const d = Math.sqrt(d2) || 1, st = Math.min(d, 520 * dt); g.x += dx / d * st; g.z += dz / d * st; }
+    if (d2 < pickR * pickR) {
+      if (list === gems) addExp(g.value, p); else healEntity(p, p.maxHp * 0.2);
+      scene.remove(g.mesh); list.splice(i, 1);
+    }
+  }
+}
+function applyRemoteUpgrade(p, k) {
+  if (!(p.pend > 0) || !UPGRADES[k] || !classOK(k, p.cls) || !canTake(p.up, k, upMax(k, p.cls))) return;
+  p.up[k]++; p.pend--; recalcPlayer(p);
+}
+function onRemoteDeath(t, killer) {
+  deathBurst(t.x, t.z, 0xff9d4d, t.scale); t.parts.group.visible = false; if (t.ui) t.ui.el.style.display = 'none';
+  Sound.explode(); killFeed(esc(t.name) + ' was eliminated');
+  const by = !killer ? 'the arena' : (killer === t ? 'yourself' : killer.name + ' the ' + CLASSES[killer.cls].name + ' (Lv ' + killer.level + ')');
+  if (conn && conn.open) conn.send({ d: [by, t.level, t.kills, Math.floor(t.totalExp + t.kills * 50), Math.floor(t.t)] });
+}
+function hostSend(dt) {
+  if (!conn || !conn.open || !remoteP) return;
+  if (conn.dataChannel && conn.dataChannel.bufferedAmount > 65536) return;       // back-pressure: skip a frame instead of choking the channel
+  const P = [], B = [], A = [], m = [];
+  const put = (e, out, isP) => {
+    out.push([e.id, r1(e.x), r1(e.z), Math.ceil(e.hp), +e.aim.toFixed(2)]);
+    if (!sentMeta.has(e.id)) { sentMeta.add(e.id); m.push([e.id, isP ? 1 : 0, e.name, e.cls, e.level, e.tier || 0, e.scale, e.maxHp]); }
+  };
+  for (const p of players) if (!p.dead) put(p, P, true);
+  for (const b of bots) if (!b.dead) put(b, B, false);
+  for (const a of arrows) A.push([r1(a.x), r1(a.z), +Math.atan2(a.vx, a.vz).toFixed(2)]);
+  const msg = { p: P, b: B, a: A };
+  if (m.length) msg.m = m;
+  slowT -= dt;
+  if (slowT <= 0) {                                                                // slow channel (4 Hz): pickups, scores, the client's own stats + upgrades
+    slowT = 0.25;
+    msg.g = gems.map((g) => [r1(g.x), r1(g.z), g.value >= 10 ? 1 : 0]);
+    msg.h = hearts.map((h) => [r1(h.x), r1(h.z)]);
+    msg.k = players.concat(bots).map((e) => [e.id, Math.floor(e.score), e.level]);
+    const q = remoteP;
+    msg.s = [Math.floor(q.exp), q.expNeed, q.level, q.kills, Math.floor(q.totalExp + q.kills * 50), Math.floor(q.t), q.maxHp, q.pend | 0, q.scale];
+    msg.u = UP_KEYS.map((k) => q.up[k]);
+  }
+  conn.send(msg);
+}
+function onHostData(d) {
+  if (d.hello) { remoteInfo = { name: String(d.hello.name || 'Guest').slice(0, 14), cls: d.hello.cls }; sentMeta.clear(); gameMode = 'host'; startGame(); return; }
+  if (!remoteP) { if (d.r && remoteInfo) { createRemote(remoteInfo); conn.send({ i: remoteP.id }); } return; }
+  if (d.r) { if (remoteP.dead) { removeRemote(); createRemote(remoteInfo); conn.send({ i: remoteP.id }); } return; }
+  if (d.c) { applyRemoteUpgrade(remoteP, d.c); return; }
+  if (d.x !== undefined) remoteP.inp = d;
+}
+
+/* ---- client side: input stream out, host state in; entities are mesh-only views ---- */
+function makeView(m) {
+  const id = m[0]; if (views.has(id)) return;
+  const isP = !!m[1], T = TIERS[m[5]] || TIERS[0], me = id === myId;
+  const e = newEntity({ id: id, isPlayer: isP, name: m[2], cls: m[3], level: m[4], tier: m[5], scale: m[6], r: 22 * m[6], maxHp: m[7], hp: m[7] });
+  e.parts = isP ? makeCharacter(me ? 0x00cfff : 0xff9d4d, me ? 0xe6fbff : 0xffe2c4, 0xffffff, e.cls) : makeCharacter(T.body, T.head, T.body, e.cls);
+  e.parts.group.scale.setScalar(e.scale); scene.add(e.parts.group);
+  e.ui = makeHpBar(e, me ? 'me' : '');
+  if (isP) {
+    e.exp = 0; e.totalExp = 0; e.expNeed = 24; e.t = 0;
+    if (me && player && player !== e) { scene.remove(player.parts.group); if (player.ui) player.ui.el.remove(); players = players.filter((p) => p !== player); }
+    players.push(e);
+  } else bots.push(e);
+  if (me) player = e;
+  views.set(id, e);
+}
+function removeView(e) {
+  views.delete(e.id);
+  if (e === player) { e.dead = true; e.parts.group.visible = false; if (e.ui) e.ui.el.style.display = 'none'; return; }
+  if (e.isPlayer) { players = players.filter((p) => p !== e); scene.remove(e.parts.group); if (e.ui) e.ui.el.remove(); return; }
+  deathBurst(e.x, e.z, (TIERS[e.tier] || TIERS[0]).body, e.scale);
+  bots = bots.filter((b) => b !== e); destroyBotVisuals(e);
+}
+function syncPool(pool, data, make, y, set) {
+  while (pool.length < data.length) { const o = make(); scene.add(o); pool.push(o); }
+  for (let i = 0; i < pool.length; i++) { const o = pool[i], r = data[i]; if (r) { o.visible = true; o.position.set(r[0], y, r[1]); if (set) set(o, r); } else o.visible = false; }
+}
+function onState(d) {
+  if (d.m) for (const m of d.m) makeView(m);
+  const seen = new Set();
+  const apply = (list) => {
+    for (const r of list) {
+      const e = views.get(r[0]); if (!e) continue;
+      seen.add(e.id); e.x = r[1]; e.z = r[2]; e.aim = r[4];
+      if (e === player && r[3] < e.hp - 0.5) { U.vig._a = 1; Sound.hit(1); shake = Math.min(1, shake + 0.2); }
+      e.hp = r[3];
+      e.parts.group.position.set(e.x, 0, e.z); e.parts.group.rotation.y = e.aim;
+    }
+  };
+  apply(d.p); apply(d.b);
+  for (const e of Array.from(views.values())) if (!seen.has(e.id) && !e.dead) removeView(e);
+  const A = d.a, n = A.length;
+  while (cArrows.length < n) { const g = new THREE.Group(); g.add(new THREE.Mesh(G.arrowShaft, basic(0xffe27a)), new THREE.Mesh(G.arrowHead, basic(0xffffff))); g.position.y = CFG.ARROW_Y; scene.add(g); cArrows.push(g); }
+  for (let i = 0; i < cArrows.length; i++) { const g = cArrows[i]; if (i < n) { g.visible = true; g.position.x = A[i][0]; g.position.z = A[i][1]; g.rotation.y = A[i][2]; } else g.visible = false; }
+  if (d.g) syncPool(cGems, d.g, () => new THREE.Mesh(G.gem, MAT.gem), 16, (o, r) => { o.material = r[2] ? MAT.gemBig : MAT.gem; o.scale.setScalar(r[2] ? 1.5 : 0.9); });
+  if (d.h) syncPool(cHearts, d.h, () => { const g = new THREE.Group(), ring = new THREE.Mesh(G.heartRing, MAT.heartRing); ring.rotation.x = Math.PI / 2.4; g.add(new THREE.Mesh(G.orb, MAT.heart), ring); return g; }, 18);
+  if (d.k) for (const r of d.k) { const e = views.get(r[0]); if (e) { e.score = r[1]; if (e.level !== r[2]) { e.level = r[2]; if (e.ui) e.ui.lv.textContent = 'Lv ' + e.level; } } }
+  if (d.s && player && !player.dead) {
+    const q = d.s;
+    Object.assign(player, { exp: q[0], expNeed: q[1], level: q[2], kills: q[3], totalExp: q[4] - q[3] * 50, t: q[5], maxHp: q[6], scale: q[8] });
+    player.r = 22 * player.scale; player.parts.group.scale.setScalar(player.scale);
+    if (q[7] > 0 && state === 'playing' && performance.now() > lvBlock) { levelPending = q[7]; openLevelUp(); }
+  }
+  if (d.u && player) UP_KEYS.forEach((k, i) => { if (player.up[k] !== d.u[i]) { player.up[k] = d.u[i]; hudDirty = true; } });
+}
+function onClientData(d) {
+  if (d.i !== undefined) { startClient(d); return; }
+  if (gameMode !== 'client') return;
+  if (d.d) {
+    const q = d.d; killerName = q[0];
+    if (player) { player.level = q[1]; player.kills = q[2]; player.totalExp = q[3] - q[2] * 50; player.t = q[4]; deathBurst(player.x, player.z, 0x00cfff, player.scale); }
+    state = 'dead'; deadTimer = 1.0; Sound.death(); Sound.setHum(0); shake = 1; return;
+  }
+  if (d.p) onState(d);
+}
+function startClient(d) {
+  Sound.init(); Sound.resume();
+  if (gameMode !== 'client') {
+    gameMode = 'client'; clearWorld(); buildArena(); player = null;
+    clock = 0; levelPending = 0; hudDirty = true; killerName = ''; camFocus.x = camFocus.z = 0; computeView();
+    U.hud.classList.remove('hidden'); U.tip.style.opacity = 1; tipT = 7;
+  }
+  myId = d.i; levelPending = 0; state = 'playing'; showOnly(null); mpUI.status.textContent = '';
+}
+function readInput() {
+  let ix = 0, iz = 0;
+  if (keys.KeyW || keys.ArrowUp) iz -= 1; if (keys.KeyS || keys.ArrowDown) iz += 1;
+  if (keys.KeyA || keys.ArrowLeft) ix -= 1; if (keys.KeyD || keys.ArrowRight) ix += 1;
+  if (touch.move.on) { ix += touch.move.x; iz += touch.move.z; }
+  const il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; }
+  if (touch.aim.on) lastAim = touch.aim.angle;
+  else {
+    ndc.set(mouse.x / window.innerWidth * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    if (raycaster.ray.intersectPlane(aimPlane, aimPoint)) { const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z; if (dx * dx + dz * dz > 64) lastAim = Math.atan2(dx, dz); }
+  }
+  return { x: +ix.toFixed(2), z: +iz.toFixed(2), a: +lastAim.toFixed(2), f: !!(mouse.down || keys.Space || touch.aim.on) };
+}
+function clientUpdate(dt) {
+  clock += dt;
+  for (const o of cGems) o.rotation.y += dt * 2.4;
+  for (const o of cHearts) o.rotation.y += dt * 2.4;
+  if (!player) return;
+  if (conn && conn.open && !player.dead) conn.send(state === 'levelup' ? { x: 0, z: 0, a: lastAim, f: false } : readInput());
+  updateFx(dt); followCamera(dt);
+  if (state === 'dead') { deadTimer -= dt; if (deadTimer <= 0 && U.over.classList.contains('hidden')) gameOver(); }
+}
+
+/* ---- menu + connection flow ---- */
+function netClose() {
+  if (conn) { try { conn.close(); } catch (e) { } }
+  if (peer) { try { peer.destroy(); } catch (e) { } }
+  conn = null; peer = null; remoteInfo = null;
+  mpUI.hostBox.classList.add('hidden'); mpUI.joinBox.classList.add('hidden'); mpUI.status.textContent = '';
+}
+function netLost() {
+  const was = gameMode; conn = null;
+  if (was === 'client') { toMenu(); mpUI.status.textContent = 'Disconnected from host.'; }
+  else if (was === 'host' && remoteP) { killFeed('<b>' + esc(remoteP.name) + '</b> left the arena'); removeRemote(); }
+}
+function setMenuMode(m) {
+  menuMode = m;
+  $('m-solo').classList.toggle('ghost', m !== 'solo'); $('m-multi').classList.toggle('ghost', m !== 'multi');
+  mpUI.panel.classList.toggle('hidden', m !== 'multi');
+  $('btn-play').style.display = m === 'solo' ? '' : 'none';
+  if (m === 'solo') netClose();
+}
+function hostGame() {
+  if (typeof Peer === 'undefined') { mpUI.status.textContent = 'PeerJS failed to load (check your connection).'; return; }
+  netClose(); mpUI.hostBox.classList.remove('hidden');
+  const id = generateShortId(); mpUI.token.textContent = id; mpUI.status.textContent = 'Starting...';
+  peer = new Peer(id);
+  peer.on('open', () => { mpUI.status.textContent = 'Waiting for a player to join...'; });
+  peer.on('connection', (c) => {
+    if (conn) { c.close(); return; }
+    conn = c; c.on('data', onHostData); c.on('close', netLost); c.on('error', netLost);
+  });
+  peer.on('error', (err) => { if (err.type === 'unavailable-id') hostGame(); else mpUI.status.textContent = 'Network error: ' + err.type; });
+}
+function joinGame() {
+  const target = $('mp-target').value.trim().toUpperCase();
+  if (!target) return;
+  if (typeof Peer === 'undefined') { mpUI.status.textContent = 'PeerJS failed to load (check your connection).'; return; }
+  if (peer) { try { peer.destroy(); } catch (e) { } peer = null; }
+  mpUI.status.textContent = 'Connecting...';
+  peer = new Peer(generateShortId());
+  peer.on('open', () => {
+    conn = peer.connect(target, { serialization: 'json' });
+    conn.on('open', () => { mpUI.status.textContent = 'Connected. Waiting for the host...'; conn.send({ hello: { name: heroName(), cls: pickedClass } }); });
+    conn.on('data', onClientData); conn.on('close', netLost); conn.on('error', netLost);
+  });
+  peer.on('error', (err) => { mpUI.status.textContent = 'Could not connect: ' + err.type; });
+}
+const sfx = () => { Sound.init(); Sound.resume(); Sound.click(); };
+$('m-solo').addEventListener('click', () => { sfx(); setMenuMode('solo'); });
+$('m-multi').addEventListener('click', () => { sfx(); setMenuMode('multi'); });
+$('mp-host').addEventListener('click', () => { sfx(); hostGame(); });
+$('mp-join').addEventListener('click', () => { sfx(); netClose(); mpUI.joinBox.classList.remove('hidden'); mpUI.status.textContent = 'Enter the 6-character token from the host.'; $('mp-target').focus(); });
+$('mp-connect').addEventListener('click', () => { sfx(); joinGame(); });
+$('mp-target').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
+
 let lastT = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - lastT) / 1000; lastT = now;
   if (!(dt > 0)) dt = 0.001;
   dt = Math.min(dt, 1 / 30);
-  if (state === 'playing' || state === 'dead') update(dt);
+  if (state === 'playing' || state === 'dead' || (gameMode !== 'solo' && state === 'levelup')) update(dt);
   else if (state === 'menu') menuUpdate(dt);
-  uiFrame(state === 'playing' || state === 'dead' ? dt : 0);
+  uiFrame(state === 'playing' || state === 'dead' || (gameMode !== 'solo' && state === 'levelup') ? dt : 0);
   renderer.render(scene, camera);
 }
 
@@ -2084,6 +2394,7 @@ function pickClass(k) {
 }
 clsCards.forEach((c) => c.addEventListener('click', () => { Sound.init(); Sound.resume(); Sound.click(); if (c.dataset.cls !== pickedClass) pickClass(c.dataset.cls); }));
 function toMenu() {
+  if (gameMode !== 'solo') { gameMode = 'solo'; netClose(); setMenuMode('solo'); }
   Sound.init(); Sound.resume(); Sound.click();
   resetGame(heroName(), pickedClass);
   state = 'menu'; mouse.down = false;
