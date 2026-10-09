@@ -64,13 +64,36 @@ canvas{display:block}
 #sc{inset:0;display:none;background:linear-gradient(#000,#000) center/1px 100% no-repeat,linear-gradient(#000,#000) center/100% 1px no-repeat,radial-gradient(circle,#0000 30vmin,#000 30.5vmin)}
 #bar{top:58%;left:50%;width:160px;height:8px;margin-left:-80px;background:#0f1923cc;display:none}
 #bar b{display:block;height:100%;background:var(--red)}
-#buy{top:50%;left:50%;transform:translate(-50%,-50%);width:340px;padding-bottom:12px;display:none;font-size:15px;background:#0f1923f2;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);box-shadow:inset 3px 0 var(--red)}
-#buy .bh{display:flex;justify-content:space-between;padding:12px 18px;margin-bottom:6px;background:#ffffff12;font-size:18px}
-#buy .r{display:flex;gap:12px;align-items:center;padding:7px 18px}
-#buy .r span{flex:1}
-#buy kbd{font-family:inherit;font-size:12px;padding:1px 9px;background:var(--c);color:var(--ink);clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
-#buy .x{opacity:.35}
-#buy small{display:block;padding:8px 18px 0;opacity:.6;font-size:11px}
+#buy{inset:0;display:none;align-items:center;justify-content:center;overflow:auto;padding:4vh 4vw;pointer-events:auto;cursor:default;text-shadow:none;font-size:14px;background:radial-gradient(ellipse at 50% 38%,#16222dcc,#0a1118eb)}
+#buy .w{width:min(1060px,100%);margin:auto}
+#buy .hd{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-bottom:22px;border-bottom:2px solid #ece8e126}
+#buy .hd>b{font-size:32px;line-height:1}
+#buy .hd i{min-width:58px;padding:6px 12px 3px;text-align:center;font-style:normal;text-transform:none;font-size:20px;color:var(--c);background:#0f1923cc;box-shadow:inset 0 -3px var(--c)}
+#buy .cr{display:flex;align-items:baseline;gap:10px;margin-left:auto;font-size:12px;opacity:.85}
+#buy .cr b{font-size:32px;line-height:1;color:var(--c)}
+#buy .bx{display:flex;align-items:center;justify-content:center;width:38px;height:38px;cursor:pointer;background:#ece8e114;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+#buy .bx:hover{background:var(--red)}
+#buy .bx svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2}
+#buy .gr{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:22px;align-items:start}
+#buy .col{display:flex;flex-direction:column;gap:12px}
+#buy .cn{padding-bottom:7px;border-bottom:1px solid #ece8e133;font-size:12px;letter-spacing:.22em;opacity:.7}
+#buy .it{display:flex;flex-direction:column;gap:4px;padding:10px 16px 12px;cursor:pointer;background:#ece8e10f;box-shadow:inset 0 0 0 1px #ece8e124;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+#buy .it svg{width:100%;height:72px;color:var(--bone)}
+#buy .it:hover{background:#3fe8d51f;box-shadow:inset 0 0 0 1px var(--c),inset 4px 0 var(--c)}
+#buy .it:hover svg{color:var(--c)}
+#buy .own{box-shadow:inset 0 0 0 1px #3fe8d566,inset 4px 0 var(--c)}
+#buy .eq{background:#3fe8d51a}
+#buy .x{opacity:.5;cursor:not-allowed}
+#buy .x .ir b{color:var(--red)}
+#buy .x:hover{background:#ff465514;box-shadow:inset 0 0 0 1px var(--red)}
+#buy .x:hover svg{color:var(--red)}
+#buy .ir,#buy .in{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:18px}
+#buy .in small{font-size:11px;opacity:.6;letter-spacing:.06em}
+#buy kbd,#buy em{padding:2px 10px 1px;font:inherit;font-size:11px;font-style:normal;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+#buy kbd{color:var(--bone);background:#ece8e12e}
+#buy em{color:var(--ink);background:var(--c)}
+#buy .ft{margin-top:22px;text-align:center;font-size:11px;opacity:.55}
+@media(max-width:820px){#buy .gr{grid-template-columns:1fr}}
 #pz{inset:0;background:#0f1923ee;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.8;white-space:pre-line;padding:20px}
 </style></head><body>
 <div class="h" id="top"></div><canvas class="h" id="mm" width="160" height="160"></canvas>
@@ -271,13 +294,34 @@ if(see){b.rt=b.rt===undefined?.3+R()*.15:b.rt-dt;turn(b,Math.atan2(dv.x,dv.z),dt
 else{b.rt=undefined;if(S.sp){const q=spike.position;if(Math.hypot(p.x-q.x,p.z-q.z)<1.8)b.df=1;else go(b,q.x,q.z,5,dt)}else if(go(b,b.post[0],b.post[1],3.5,dt))turn(b,0,dt)}
 if(b.bl>0)b.bu=0;if(b.bu>0){b.t2-=dt;if(b.t2<=0){shoot(b,o,e);b.bu--;b.t2=.11;if(!b.bu)b.cd=.5+R()*.5}}
 const bp=V(p.x,1.2,p.z);if(!S.pd&&V(0,0,-1).applyQuaternion(cam.quaternion).angleTo(bp.clone().sub(cam.position))<.9&&los(cam.position,bp))b.sp=1.2}
+/* ---------- buy menu: silhouettes (viewBox 0 0 160 56) and the three columns ---------- */
+const SV={
+classic:'<path d="M34 14h80l8 4v9H34z"/><path d="M121 19h6v6h-6z"/><path d="M34 26h72v6H34z"/><path d="M37 31h33l-4 17H32z"/><path d="M70 32l2 8h22v-8" fill=none stroke=currentColor stroke-width=3 /><path d="M38 11h8v3h-8zM106 11h6v3h-6z"/>',
+vandal:'<path d="M4 19l26-4v16L10 36z"/><path d="M29 14h47v17H29z"/><path d="M35 10h34v5H35z"/><path d="M60 30h11l-5 15H54z"/><path d="M80 30h13l8 12-3 5-8-2-10-15z"/><path d="M75 18h43v12H75z"/><path d="M78 13h40v6H78z"/><path d="M117 16h32v4h-32z"/><path d="M146 13h10v10h-10z"/><path d="M122 10h4v8h-4z"/>',
+operator:'<path d="M3 27l8-4h25v14H20l-6 8H3z"/><path d="M35 23h43v13H35z"/><path d="M48 9h52v7H48z"/><path d="M44 7h7v11h-7z"/><path d="M96 6h11v13H96z"/><path d="M56 16h4v8h-4zM86 16h4v8h-4z"/><path d="M74 30l10 8" fill=none stroke=currentColor stroke-width=3 /><circle cx="86" cy="39" r="3.2"/><path d="M52 35h14v7H52z"/><path d="M38 35h10l-3 13h-8z"/><path d="M77 25h31v10H77z"/><path d="M107 28h41v4h-41z"/><path d="M146 24h12v12h-12z"/>',
+shield:'<path fill-rule=evenodd d="M80 7l22 6.8v14.4c0 11.9-8.5 18.7-22 23C66.4 46.7 57.9 39.9 57.9 28V13.6zM80 12.7l16.2 5.1v10.2c0 8.5-6 13.6-16.2 17-10.2-3.4-16.2-8.5-16.2-17V17.8z"/>',
+shield2:'<path fill-rule=evenodd d="M80 7l22 6.8v14.4c0 11.9-8.5 18.7-22 23C66.4 46.7 57.9 39.9 57.9 28V13.6zM80 12.7l16.2 5.1v10.2c0 8.5-6 13.6-16.2 17-10.2-3.4-16.2-8.5-16.2-17V17.8zM80 19.5l9.4 3V28c0 5.1-3.8 8.1-9.4 10.2-5.5-2.1-9.4-5.1-9.4-10.2v-5.5z"/>'},
+SG=[['Sidearms',[-1]],['Sniper / Rifles',[0,1]],['Shields',[2,3]]];   /* [column title, indexes into SH; -1 = the free Classic] */
+function shopHTML(){
+const card=i=>{const q=i<0?['Classic',0,'classic']:SH[i],k=q[2],wp=typeof k=='string',have=wp?own[k]:P.ar>=k,eq=wp&&cur==k,d=wp&&WP[k],
+ act=have?(wp&&!eq?`sw('${k}');shopDraw()`:''):`buy(${i});shopDraw()`;   /* owned weapon = equip, owned shield = inert, else buy */
+return`<div class="it${have?' own':''}${eq?' eq':''}${!have&&cr<q[1]?' x':''}"${act?` onmousedown="if(!event.button){${act}}"`:''}>`
++`<div class=ir><b>${q[1]?'$'+q[1]:'Free'}</b>${have?`<em>${eq?'Equipped':'Owned'}</em>`:`<kbd>${i+5}</kbd>`}</div>`
++`<svg viewBox="0 0 160 56" fill=currentColor>${SV[wp?k:k>25?'shield2':'shield']}</svg>`
++`<div class=in><span>${q[0]}</span><small>${d?d.mag+' rnd &middot; '+d.d.b+' / '+d.d.h+' dmg':'+'+k+' armor'}</small></div></div>`};
+return`<div class=w onmousedown="event.stopPropagation()"><div class=hd><b>Buy phase</b><i id=bt></i><span class=cr>Credits<b>$${cr}</b></span><div class=bx onmousedown="if(!event.button){shop(0);shopDraw()}"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11"/></svg></div></div>`
++`<div class=gr>${SG.map(([n,l])=>`<div class=col><div class=cn>${n}</div>${l.map(card).join('')}</div>`).join('')}</div>`
++`<div class=ft>Click an item to buy &middot; 5-8 quick buy &middot; B / Esc to close</div></div>`}
+function shopDraw(){$('buy').style.display=bq?'flex':'none';$('msg').style.visibility=bq?'hidden':'';
+if(bq){up('buy',shopHTML());const e=$('bt'),s=Math.max(0,Math.ceil(S.t))+'s';if(e.textContent!=s)e.textContent=s}}   /* timer lives outside the cached html so the cards are not rebuilt every second */
 function hud(w,am){const t=Math.max(0,Math.ceil(S.t)),hp=Math.ceil(P.hp),rl=rel>0;
 up('top',`<div class="t${S.sp?' sp':''}"><b class=a>${S.sc[0]}</b><i>${S.sp?Math.max(0,S.sb).toFixed(1):(t/60|0)+':'+('0'+t%60).slice(-2)}</i><b class=e>${S.sc[1]}</b></div><small>${S.ph=='freeze'?'Buy phase':S.sp?'Spike planted':S.ph=='act'?'Round '+(S.sc[0]+S.sc[1]+1):'Round over'}</small>`);
 up('st',`<div class=p><div class="r s"><svg viewBox="0 0 16 18" width=16 height=18 fill=currentColor><path d="M8 0l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V3z"/></svg><b>${P.ar}</b><div class="sg x" style="--k:#c9fffa">${seg(P.ar,2,25)}</div></div><div class=r><b${hp<30?' class=lo':''}>${hp}</b><div class=sg style="--k:${hp<30?'#ff4655':'#ece8e1'}">${seg(hp,10,10)}</div></div></div>`);
 up('ab','CQE'.replace(/./g,k=>`<div class="sl${AB[k]?' on':''}"><kbd>${k}</kbd><svg viewBox="0 0 26 26">${AI[k]}</svg><div class=pp>${[...Array(AX[k])].map((_,i)=>'<i'+(i<AB[k]?' class=f':'')+'></i>').join('')}</div></div>`));
 up('wp',`<div class=p><div class=n>${wi(cur,15)}<span>${w.n}</span></div><div class="m${rl?' rl':am.m<=w.mag/4?' z':''}">${am.m}<span>/ ${am.r}</span></div>${rl?`<div class=rb><b style="width:${(1-rel/w.rl)*100|0}%"></b></div>`:''}<div class=c><span>${rl?'Reloading':''}</span><em>$${cr}</em></div></div>`);
-$('buy').style.display=bq?'block':'none';if(bq)up('buy',`<div class=bh>Buy phase<b>$${cr}</b></div>`+SH.map((q,i)=>`<div class="r${cr<q[1]?' x':''}"><kbd>${i+5}</kbd><span>${q[0]}</span><b>$${q[1]}</b></div>`).join('')+'<small>B closes</small>');
-$('fl').style.opacity=flb/2.5;const sn=ads&&w.sn&&!S.pd;$('sc').style.display=sn?'block':'none';$('ch').style.display=sn?'none':'block';gun.visible=!sn;
+if(bq&&S.ph!='freeze')shop(0);   /* buy phase ended with the menu still open: close it and hand the mouse back */
+shopDraw();
+$('fl').style.opacity=flb/2.5;const sn=ads&&w.sn&&!S.pd;$('sc').style.display=sn?'block':'none';$('ch').style.display=sn||bq?'none':'block';gun.visible=!sn;
 $('bar').style.display=S.pl>0?'block':'none';$('bar').firstChild.style.width=S.pl/4*100+'%';
 const g=Math.min(60,5+spread()*800),c=$('ch').children;[[0,-g],[0,g],[-g,0],[g,0]].forEach((q,k)=>c[k].style.transform='translate('+q[0]+'px,'+q[1]+'px)'+(k>1?' rotate(90deg)':''))}
 function radar(){const s=160/64,X=x=>(x+32)*s;mc.clearRect(0,0,160,160);B.forEach(b=>{if(b.y0>1)return;mc.fillStyle=b.y1>2.6&&b.y1<4?'#d9cfa0':'#8a8e99';mc.fillRect(X(b.x-b.w/2),X(b.z-b.d/2),b.w*s,b.d*s)});PT.forEach(p=>{mc.fillStyle='#2b303a';mc.fillRect(X(p[0]),X(p[2]),(p[1]-p[0])*s,(p[3]-p[2])*s)});RP.forEach(q=>{mc.fillStyle='#e9d9a0';mc.fillRect(X(q.x0),X(q.z0),(q.x1-q.x0)*s,(q.z1-q.z0)*s)});
@@ -322,21 +366,27 @@ ptc.forEach(x=>{x.t-=dt;const q=x.m.geometry.attributes.position,a=q.array;x.vel
 prune(tr,x=>x.t<=0);prune(ptc,x=>x.t<=0&&(x.m.geometry.dispose(),x.m.material.dispose(),1));prune(smokes,x=>x.t<=0);prune(fires,x=>x.t<=0);prune(gr,x=>x.t>=50);
 if(mt>0){mt-=dt;if(mt<=0)msg('')}
 hud(w,am);radar()}
+let rq=0;   /* 1 while a pointer re-lock (after closing the menu) is in flight */
+function shop(o){o=o?1:0;if(o==bq)return;bq=o;md=trig=ads=0;   /* also drops any held fire/aim input */
+if(o)document.exitPointerLock();   /* free the cursor so the menu can be clicked */
+else if(!fb){rq=1;const p=ren.domElement.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}}   /* back to mouse-look; a refusal ends up in onpointerlockerror */
 onkeydown=e=>{if(e.ctrlKey&&lock)e.preventDefault();if(e.repeat)return;const c=e.code;K[c]=1;
 if(c=='KeyR')reload();if(c=='Digit1'&&pri)sw(pri);if(c=='Digit2')sw('classic');
 if(c=='KeyE')thr('E');if(c=='KeyQ')thr('Q');if(c=='KeyC')thr('C');
-if(c=='KeyB'&&S.ph=='freeze')bq^=1;
-if(bq&&c>='Digit5'&&c<='Digit8')buy(+c[5]-5);
+if(c=='KeyB'&&S.ph=='freeze'&&lock)shop(!bq);else if(c=='Escape'&&bq)shop(0);
+if(bq&&c>='Digit5'&&c<='Digit8'){const i=+c[5]-5,k=SH[i][2];if(typeof k=='string'?!own[k]:P.ar<k)buy(i)}   /* hotkeys skip what you already own, like the cards */
 if(c=='Space')e.preventDefault()};
 onkeyup=e=>{K[e.code]=0};
-onmousedown=e=>{if(!lock){const p=ren.domElement.requestPointerLock();if(p&&p.catch)p.catch(()=>{fb=lock=1;$('pz').style.display='none'});AC=AC||new(window.AudioContext||window.webkitAudioContext)();return}
+onmousedown=e=>{if(bq)return;   /* menu open: its own handlers take the click, the gun never fires */
+if(!lock){const p=ren.domElement.requestPointerLock();if(p&&p.catch)p.catch(()=>{fb=lock=1;$('pz').style.display='none'});AC=AC||new(window.AudioContext||window.webkitAudioContext)();return}
 if(S.ph=='over'){S.sc=[0,0];cr=800;S.pd=1;round();return}
 if(e.button==0)md=trig=1;if(e.button==2)ads=1};
 onmouseup=e=>{if(e.button==0)md=trig=0;if(e.button==2)ads=0};
 oncontextmenu=e=>e.preventDefault();
-onmousemove=e=>{if(!lock)return;VM.dx+=e.movementX;VM.dy+=e.movementY;const k=cam.fov/75*.0022;yaw-=e.movementX*k;pit=Math.max(-1.5,Math.min(1.5,pit-e.movementY*k))};
-document.onpointerlockchange=()=>{lock=document.pointerLockElement==ren.domElement||fb;$('pz').style.display=lock?'none':'flex'};
-document.onpointerlockerror=()=>{fb=lock=1;$('pz').style.display='none'};
+onmousemove=e=>{if(!lock||bq)return;VM.dx+=e.movementX;VM.dy+=e.movementY;const k=cam.fov/75*.0022;yaw-=e.movementX*k;pit=Math.max(-1.5,Math.min(1.5,pit-e.movementY*k))};
+/* while the menu is open (or a re-lock is pending) an unlocked cursor is expected: keep `lock` true so tick() keeps running and the pause screen stays hidden */
+document.onpointerlockchange=()=>{const on=document.pointerLockElement==ren.domElement;if(on){rq=0;if(bq)document.exitPointerLock()}lock=on||fb||bq||rq;$('pz').style.display=lock?'none':'flex'};
+document.onpointerlockerror=()=>{if(rq){rq=0;lock=bq||fb}else fb=lock=1;$('pz').style.display=lock?'none':'flex'};
 onresize=()=>{ren.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};
 let last=performance.now();
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;if(lock)tick(dt);ren.render(scene,cam)}
